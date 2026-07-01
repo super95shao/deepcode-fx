@@ -2,11 +2,11 @@
   "name": "deepcode-fx",
   "displayName": "DeepCode FX",
   "description": "Forked from DeepCode VSCode with additional features: diff summary, settings UI, model/reasoning quick switcher",
-  "version": "0.1.22.4",
-  "publisher": "vegamo/shao",
+  "version": "0.2.4",
+  "publisher": "shao",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/super95shao/deepcode-fx/tree/fx"
   },
   "engines": {
     "vscode": "^1.85.0"
