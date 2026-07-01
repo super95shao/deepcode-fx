@@ -13,8 +13,7 @@ VSCode 内置的交互式 AI 编程助手，专为 DeepSeek V4 模型优化。
 | Feature / 功能                              | Original / 原版 | This Fork / 本 Fork                                                                   |
 | ------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
 | 差异汇总 / Diff Summary                     | 无              | 可折叠的 `Changes` 汇总，显示 `+N -M (N files)`，每个文件有独立的增删统计和可跳转行号 |
-| 差异编辑匹配 / Edit Matching                | 基础精确匹配    | 逐行标准化对比：容忍 tab/空格缩进差异、行尾空白、Read 工具行号前缀                    |
-| 上下文压缩 / Context Compression            | 无              | 主动压缩对话上下文，优化 token 用量，降低 API 成本                                    |
+| 主动上下文压缩 / Context Compression            | 无              | 主动压缩对话上下文，优化 token 用量，降低 API 成本                                    |
 | 余额显示 / Balance Display                  | 无              | 界面中显示 API 余额，点击余额自动跳转至 usage 页面                                    |
 | 模型快捷切换 / Model Quick Switcher         | 无              | 底部工具栏下拉菜单，在 `pro` / `flash` 之间切换（同时保存到 global 和 project 配置）  |
 | 思考强度快捷切换 / Reasoning Quick Switcher | 无              | 底部工具栏下拉菜单，在 `max` / `high` 之间切换                                        |
