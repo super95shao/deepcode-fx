@@ -17,6 +17,8 @@ DeepCode FX is an enhanced fork of DeepCode VSCode, retaining the original funct
 | Reasoning Quick Switcher | None | Dropdown in toolbar to toggle `max` / `high` (saves to both global + project settings) |
 | Line-number Jump | None | Clickable line numbers in all diff previews that open VSCode at the exact line |
 | Edit Matching | Basic exact match | Added normalized line-by-line matching: tolerates tab/space indentation differences, trailing whitespace, and Read-tool line-number prefixes |
+| Context Compression | None | Actively compresses conversation context to optimize token usage and reduce API costs |
+| Balance Display | None | Shows API balance in the UI; clicking the balance auto-navigates to the usage page |
 | Smart Scrolling | Always scroll to bottom | Auto-scroll only when user is at bottom; forced scroll on initial load and user messages only |
 | Model Support | Multiple providers | DeepSeek-only (V4), simplified codebase |
 | Chinese Localization | None | Toolbar buttons automatically display Chinese labels when VSCode language is Chinese |
