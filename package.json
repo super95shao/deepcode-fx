@@ -1,8 +1,8 @@
 {
   "name": "deepcode-fx",
   "displayName": "DeepCode FX",
-  "description": "Forked from DeepCode VSCode with additional features: diff summary, settings UI, model/reasoning quick switcher",
-  "version": "0.2.4",
+  "description": "Forked from DeepCode VSCode with additional features: diff summary, edit matching, context compression, balance display, model/reasoning quick switcher, workspace switching",
+  "version": "0.2.5",
   "publisher": "shao",
   "repository": {
     "type": "git",
@@ -24,8 +24,6 @@
     "templates/prompts/**",
     "templates/skills/**",
     "README.md",
-    "README_cn.md",
-    "README_en.md",
     "LICENSE"
   ],
   "contributes": {

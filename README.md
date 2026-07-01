@@ -13,7 +13,7 @@ VSCode 内置的交互式 AI 编程助手，专为 DeepSeek V4 模型优化。
 | Feature / 功能                              | Original / 原版 | This Fork / 本 Fork                                                                   |
 | ------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
 | 差异汇总 / Diff Summary                     | 无              | 可折叠的 `Changes` 汇总，显示 `+N -M (N files)`，每个文件有独立的增删统计和可跳转行号 |
-| 主动上下文压缩 / Context Compression            | 无              | 主动压缩对话上下文，优化 token 用量，降低 API 成本                                    |
+| 主动上下文压缩 / Context Compression        | 无              | 主动压缩对话上下文，优化 token 用量，降低 API 成本                                    |
 | 余额显示 / Balance Display                  | 无              | 界面中显示 API 余额，点击余额自动跳转至 usage 页面                                    |
 | 模型快捷切换 / Model Quick Switcher         | 无              | 底部工具栏下拉菜单，在 `pro` / `flash` 之间切换（同时保存到 global 和 project 配置）  |
 | 思考强度快捷切换 / Reasoning Quick Switcher | 无              | 底部工具栏下拉菜单，在 `max` / `high` 之间切换                                        |
@@ -50,14 +50,6 @@ Example / 示例:
   "reasoningEffort": "max"
 }
 ```
-
-## Quick Operation / 快速上手
-
-- **Toolbar dropdowns / 工具栏下拉**: Quickly switch model (`pro`/`flash`) and reasoning effort (`max`/`high`) without opening settings
-- **Settings gear / 设置齿轮**: Full settings page with global, project, and workspace scopes
-- **Workspace banner / 工作区横幅**: When loading a conversation from another project, a banner appears with a one-click "Switch here" button
-- **Diff summary / Diff 汇总**: After each assistant response, a collapsible `Changes` section shows all file modifications with per-file line-number navigation
-- **Smart scrolling / 智能滚屏**: Browsing history won't be interrupted by new messages; auto-scroll only when already at the bottom
 
 ## Build & Package / 构建与打包
 
