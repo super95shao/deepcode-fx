@@ -70,7 +70,7 @@ export function buildDiffPreview(
   filePath: string,
   originalContent: string | null,
   updatedContent: string,
-  maxLines = 40
+  maxLines = 5000
 ): string | null {
   const original = originalContent === null ? null : normalizeContent(originalContent);
   const updated = normalizeContent(updatedContent);

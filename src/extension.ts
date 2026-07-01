@@ -9,11 +9,9 @@ import {
   SessionManager,
   getCompactPromptTokenThreshold,
   type LlmStreamProgress,
-  type PermissionScope,
   type SessionEntry,
   type SkillInfo,
   type UserPromptContent,
-  type UserToolPermission,
 } from "./session";
 import {
   resolveSettingsSources,
@@ -30,21 +28,8 @@ type ReasoningMessageParams = {
   reasoning_content?: string;
 };
 
-const VALID_PERMISSION_SCOPES = new Set<PermissionScope>([
-  "read-in-cwd",
-  "read-out-cwd",
-  "write-in-cwd",
-  "write-out-cwd",
-  "delete-in-cwd",
-  "delete-out-cwd",
-  "query-git-log",
-  "mutate-git-log",
-  "network",
-  "mcp",
-]);
-
 class DeepcodingViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = "deepcode.chatView";
+  public static readonly viewType = "deepcode-fx.chatView";
 
   private readonly context: vscode.ExtensionContext;
   private webviewView: vscode.WebviewView | undefined;
@@ -84,7 +69,6 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
           type: "sessionStatus",
           sessionId: entry.id,
           status: entry.status,
-          askPermissions: entry.askPermissions,
           processes: this.serializeProcesses(entry.processes),
           tokenTelemetry: this.buildTokenTelemetry(entry),
         });
@@ -122,6 +106,12 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
         this.loadInitialSession();
         // 同时请求 skills 列表
         this.sendSkillsList();
+        // 发送工作区信息，使设置页面的显示即时更新
+        this.sendMessage({
+          type: "workspaceInfo",
+          workspaceRoot: this.getWorkspaceRoot(),
+          sessionManagerRoot: this.sessionManager.getProjectRoot(),
+        });
       } else if (message?.type === "requestSkills") {
         // 请求 skills 列表
         this.sendSkillsList();
@@ -130,25 +120,15 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
         const images = Array.isArray(message.images)
           ? message.images.filter((image: unknown): image is string => typeof image === "string" && image.length > 0)
           : [];
-        const permissions = parseUserToolPermissions(message.permissions);
-        const alwaysAllows = parsePermissionScopes(message.alwaysAllows);
-        if (!prompt && images.length === 0 && permissions.length === 0 && alwaysAllows.length === 0) {
+        if (!prompt && images.length === 0) {
           return;
         }
         // 获取 skills
         const skills = message.skills || [];
-        await this.handlePrompt(prompt, skills, images, {
-          permissions: permissions.length > 0 ? permissions : undefined,
-          alwaysAllows: alwaysAllows.length > 0 ? alwaysAllows : undefined,
-        });
+        await this.handlePrompt(prompt, skills, images);
       } else if (message?.type === "interrupt") {
         // 中断当前会话
         this.sessionManager.interruptActiveSession();
-      } else if (message?.type === "denyPermission") {
-        const sessionId = String(message.sessionId || this.sessionManager.getActiveSessionId() || "").trim();
-        if (sessionId) {
-          this.handlePermissionDenied(sessionId);
-        }
       } else if (message?.type === "createNewSession") {
         await this.createNewSession();
       } else if (message?.type === "selectSession") {
@@ -165,13 +145,91 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
         if (filePath) {
           await this.openFileInEditor(filePath, line);
         }
-      } else if (message?.type === "copyText") {
-        const text = String(message.text || "");
-        if (text) {
-          await vscode.env.clipboard.writeText(text);
+      } else if (message?.type === "loadSettings") {
+        this.sendMessage({
+          type: "settingsData",
+          userSettings: this.readUserSettings(),
+          projectSettings: this.readProjectSettings(),
+          currentWorkspace: this.getWorkspaceRoot(),
+          sessionManagerRoot: this.sessionManager.getProjectRoot(),
+        });
+      } else if (message?.type === "saveUserSettings") {
+        const success = this.writeUserSettings(message.settings);
+        this.sendMessage({ type: "saveResult", scope: "user", success });
+      } else if (message?.type === "saveProjectSettings") {
+        const success = this.writeProjectSettings(message.settings);
+        this.sendMessage({ type: "saveResult", scope: "project", success });
+      } else if (message?.type === "saveBothSettings") {
+        const userOk = this.writeUserSettings(message.userSettings);
+        const projOk = this.writeProjectSettings(message.projectSettings);
+        this.sendMessage({ type: "saveResult", scope: "both", success: userOk && projOk });
+      } else if (message?.type === "switchWorkspace") {
+        const newRoot = String(message.path || "").trim();
+        if (newRoot) {
+          this.switchWorkspace(newRoot);
         }
-      }
-    });
+      } else if (message?.type === "requestBalance") {
+        await this.handleRequestBalance();
+      } else if (message?.type === "openUrl") {
+        const url = String(message.url || "").trim();
+        if (url) {
+          this.handleOpenUrl(url);
+        }
+      } else if (message?.type === "compactSession") {
+        const activeId = this.sessionManager.getActiveSessionId();
+        if (activeId) {
+          const webview = this.webviewView?.webview;
+          if (!webview) return;
+
+          // 1. 发送 "processing" 状态到 webview，暂停用户输入
+          const sessionBefore = this.sessionManager.getSession(activeId);
+          webview.postMessage({
+            type: "sessionStatus",
+            sessionId: activeId,
+            status: "processing",
+            processes: null,
+            tokenTelemetry: this.buildTokenTelemetry(sessionBefore),
+          });
+
+          // 2. 发送 "compacting..." 思考消息（与自动压缩流程一致）
+          const now = new Date().toISOString();
+          const compactingContent = "The conversation is getting long, compacting...";
+          const compactMessage = {
+            id: `compact-${activeId}`,
+            sessionId: activeId,
+            role: "assistant",
+            content: compactingContent,
+            contentParams: null,
+            messageParams: null,
+            compacted: false,
+            visible: true,
+            createTime: now,
+            updateTime: now,
+            meta: { asThinking: true },
+            html: this.md.render(compactingContent),
+          };
+          webview.postMessage({
+            type: "appendMessage",
+            message: compactMessage,
+            shouldConnect: false,
+          });
+
+          // 3. 执行压缩
+          await this.sessionManager.compactSession(activeId);
+
+          // 4. 压缩完成后恢复状态为 completed
+          const sessionAfter = this.sessionManager.getSession(activeId);
+          webview.postMessage({
+            type: "sessionStatus",
+            sessionId: activeId,
+            status: "completed",
+            processes: null,
+            tokenTelemetry: this.buildTokenTelemetry(sessionAfter),
+          });
+        } else {
+          vscode.window.showWarningMessage("No active session to compact");
+        }
+      }    });
   }
 
   private async loadInitialSession(): Promise<void> {
@@ -227,7 +285,6 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
       sessionId,
       summary: session.summary || "Untitled",
       status: session.status,
-      askPermissions: session.askPermissions,
       processes: this.serializeProcesses(session.processes),
       tokenTelemetry: this.buildTokenTelemetry(session),
       sessions: sessionsList,
@@ -242,7 +299,23 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
               : undefined,
           meta: m.meta,
         })),
+      // 跨项目会话：附带原始项目路径和当前插件工作区，webview 据此显示切换提示
+      originalProjectPath: session.originalPath ?? this.sessionManager.getProjectRoot(),
+      currentProjectRoot: this.sessionManager.getProjectRoot(),
     });
+  }
+
+  /** 切换工作区根路径 */
+  private switchWorkspace(newRoot: string): void {
+    this.sessionManager.setProjectRoot(newRoot);
+    this.sendMessage({ type: "workspaceChanged", path: newRoot });
+    // 刷新技能列表（基于新工作区）
+    void this.sendSkillsList();
+    // 重新加载当前会话，让 webview 更新会话列表和提示
+    const activeId = this.sessionManager.getActiveSessionId();
+    if (activeId) {
+      this.loadSession(activeId);
+    }
   }
 
   private showSessionsList(): void {
@@ -299,12 +372,7 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
     this.sendMessage({ type: "skillsList", skills });
   }
 
-  private async handlePrompt(
-    prompt: string,
-    skills?: SkillInfo[],
-    imageUrls?: string[],
-    options: { permissions?: UserToolPermission[]; alwaysAllows?: PermissionScope[] } = {}
-  ): Promise<void> {
+  private async handlePrompt(prompt: string, skills?: SkillInfo[], imageUrls?: string[]): Promise<void> {
     if (!this.webviewView) {
       return;
     }
@@ -312,26 +380,14 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
     const webview = this.webviewView.webview;
     const normalizedImages = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
     const displayPrompt = prompt || (normalizedImages.length > 0 ? "粘贴的图像" : "");
-    const isPermissionContinue =
-      prompt === "/continue" &&
-      normalizedImages.length === 0 &&
-      ((options.permissions?.length ?? 0) > 0 || (options.alwaysAllows?.length ?? 0) > 0);
 
     // 先显示用户消息（原始文本，不做 HTML 格式化）
-    if (displayPrompt && !isPermissionContinue) {
-      webview.postMessage({ type: "userMessage", content: displayPrompt });
-    }
+    webview.postMessage({ type: "userMessage", content: displayPrompt });
 
     webview.postMessage({ type: "loading", value: true });
 
     try {
-      const userPrompt: UserPromptContent = {
-        text: prompt,
-        skills,
-        imageUrls: normalizedImages,
-        permissions: options.permissions,
-        alwaysAllows: options.alwaysAllows,
-      };
+      const userPrompt: UserPromptContent = { text: prompt, skills, imageUrls: normalizedImages };
       await this.sessionManager.handleUserPrompt(userPrompt);
       await this.sendSkillsList();
 
@@ -342,7 +398,6 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
           type: "sessionStatus",
           sessionId: activeSessionId,
           status: activeSession.status,
-          askPermissions: activeSession.askPermissions,
           processes: this.serializeProcesses(activeSession.processes),
           tokenTelemetry: this.buildTokenTelemetry(activeSession),
         });
@@ -370,22 +425,6 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
     } finally {
       webview.postMessage({ type: "loading", value: false });
     }
-  }
-
-  private handlePermissionDenied(sessionId: string): void {
-    this.sessionManager.denySessionPermission(sessionId);
-    const session = this.sessionManager.getSession(sessionId);
-    if (session) {
-      this.sendMessage({
-        type: "sessionStatus",
-        sessionId,
-        status: session.status,
-        askPermissions: session.askPermissions,
-        processes: this.serializeProcesses(session.processes),
-        tokenTelemetry: this.buildTokenTelemetry(session),
-      });
-    }
-    this.showSessionsList();
   }
 
   private createOpenAIClient(): {
@@ -515,6 +554,43 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private writeUserSettings(settings: DeepcodingSettings | null): boolean {
+    try {
+      const settingsPath = path.join(os.homedir(), ".deepcode", "settings.json");
+      if (settings === null) {
+        if (fs.existsSync(settingsPath)) fs.unlinkSync(settingsPath);
+        return true;
+      }
+      fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf8");
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(`Failed to write ~/.deepcode/settings.json: ${message}`);
+      return false;
+    }
+  }
+
+  private writeProjectSettings(settings: DeepcodingSettings | null): boolean {
+    const workspaceRoot = this.getWorkspaceRoot();
+    try {
+      const settingsPath = path.join(workspaceRoot, ".deepcode", "settings.json");
+      if (settings === null) {
+        if (fs.existsSync(settingsPath)) fs.unlinkSync(settingsPath);
+        return true;
+      }
+      fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf8");
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(
+        `Failed to write ${path.join(workspaceRoot, ".deepcode", "settings.json")}: ${message}`
+      );
+      return false;
+    }
+  }
+
   private getWorkspaceRoot(): string {
     const workspace = vscode.workspace.workspaceFolders?.[0];
     if (workspace) {
@@ -580,44 +656,50 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
     editor.selection = selection;
     editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
   }
-}
 
-function parseUserToolPermissions(value: unknown): UserToolPermission[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  const result: UserToolPermission[] = [];
-  for (const item of value) {
-    if (!item || typeof item !== "object") {
-      continue;
+  private async handleRequestBalance(): Promise<void> {
+    const settings = this.resolveCurrentSettings();
+    const apiKey = settings.apiKey;
+    if (!apiKey) {
+      this.sendMessage({ type: "balanceData", balance: null });
+      return;
     }
-    const record = item as { toolCallId?: unknown; permission?: unknown };
-    if (typeof record.toolCallId !== "string" || !record.toolCallId.trim()) {
-      continue;
-    }
-    if (record.permission !== "allow" && record.permission !== "deny") {
-      continue;
-    }
-    result.push({ toolCallId: record.toolCallId, permission: record.permission });
-  }
-  return result;
-}
 
-function parsePermissionScopes(value: unknown): PermissionScope[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  const result: PermissionScope[] = [];
-  for (const item of value) {
-    if (typeof item !== "string" || !VALID_PERMISSION_SCOPES.has(item as PermissionScope)) {
-      continue;
+    try {
+      const response = await fetch("https://api.deepseek.com/user/balance", {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!response.ok) {
+        this.sendMessage({ type: "balanceData", balance: null });
+        return;
+      }
+      const data = (await response.json()) as {
+        is_available: boolean;
+        balance_infos: Array<{ currency: string; total_balance: string }>;
+      };
+      if (!data?.balance_infos?.length) {
+        this.sendMessage({ type: "balanceData", balance: null });
+        return;
+      }
+      // Pick the balance info with the highest total_balance
+      let best = data.balance_infos[0];
+      for (let i = 1; i < data.balance_infos.length; i++) {
+        if (Number(data.balance_infos[i].total_balance) > Number(best.total_balance)) {
+          best = data.balance_infos[i];
+        }
+      }
+      this.sendMessage({
+        type: "balanceData",
+        balance: { currency: best.currency, total: Number(best.total_balance) },
+      });
+    } catch {
+      this.sendMessage({ type: "balanceData", balance: null });
     }
-    const scope = item as PermissionScope;
-    if (!result.includes(scope)) {
-      result.push(scope);
-    }
   }
-  return result;
+
+  private handleOpenUrl(url: string): void {
+    vscode.env.openExternal(vscode.Uri.parse(url));
+  }
 }
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -633,9 +715,9 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(provider);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider(DeepcodingViewProvider.viewType, provider));
   context.subscriptions.push(
-    vscode.commands.registerCommand("deepcode.openView", async () => {
-      await vscode.commands.executeCommand("workbench.view.extension.deepcode");
-      await vscode.commands.executeCommand("deepcode.chatView.focus");
+    vscode.commands.registerCommand("deepcode-fx.openView", async () => {
+      await vscode.commands.executeCommand("workbench.view.extension.deepcode-fx");
+      await vscode.commands.executeCommand("deepcode-fx.chatView.focus");
     })
   );
 }

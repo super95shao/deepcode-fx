@@ -1,11 +1,40 @@
-# Deep Code
+# DeepCode FX
 
-[Deep Code](https://marketplace.visualstudio.com/items?itemName=vegamo.deepcode-vscode) is an AI coding assistant extension for Visual Studio Code, specifically optimized for the latest `deepseek-v4` model.
+Forked from [DeepCode VSCode](https://marketplace.visualstudio.com/items?itemName=vegamo.deepcode-vscode)
+
+DeepCode FX is an enhanced fork of DeepCode VSCode, retaining the original functionality while adding significant UI and interaction improvements.
+
+> 🧠 **Fun fact**: This plugin was itself built with DeepSeek V4 — AI writing AI tools. How meta is that?
+
+## Differences from Original
+
+| Feature | Original | This Fork |
+|---------|----------|-----------|
+| Diff Summary | None | Collapsible `Changes` parent with `+N -M (N files)` per-file breakdown and clickable line numbers |
+| Settings Page | None | In-plugin settings UI with Global/Project collapsible sections, API key, model, thinking toggles |
+| Workspace Switching | None | Browse and load sessions across all projects; banner prompt + one-click switch when opening cross-project conversations |
+| Model Quick Switcher | None | Dropdown in toolbar to switch `pro` / `flash` (saves to both global + project settings) |
+| Reasoning Quick Switcher | None | Dropdown in toolbar to toggle `max` / `high` (saves to both global + project settings) |
+| Line-number Jump | None | Clickable line numbers in all diff previews that open VSCode at the exact line |
+| Edit Matching | Basic exact match | Added normalized line-by-line matching: tolerates tab/space indentation differences, trailing whitespace, and Read-tool line-number prefixes |
+| Smart Scrolling | Always scroll to bottom | Auto-scroll only when user is at bottom; forced scroll on initial load and user messages only |
+| Model Support | Multiple providers | DeepSeek-only (V4), simplified codebase |
+| Chinese Localization | None | Toolbar buttons automatically display Chinese labels when VSCode language is Chinese |
+| Extension IDs | `ccui.*` | `deepcode-fx.*` — can coexist with the original plugin |
+
+## Requirements
+
+- VSCode ^1.85.0
+- A DeepSeek API key
 
 ## Configuration
 
-Create `~/.deepcode/settings.json` with:
+Settings are stored in two locations (project settings override global settings):
 
+- **Global**: `~/.deepcode/settings.json`
+- **Project**: `{workspaceRoot}/.deepcode/settings.json`
+
+Example:
 ```json
 {
   "env": {
@@ -18,70 +47,30 @@ Create `~/.deepcode/settings.json` with:
 }
 ```
 
-## Key Features
+## Quick Operation
 
-### **Skills**
-Deep Code supports agent skills that allows you to extend the assistant's capabilities:
+- **Toolbar dropdowns**: Quickly switch model (`pro`/`flash`) and reasoning effort (`max`/`high`) without opening settings
+- **Settings gear**: Full settings page with global, project, and workspace scopes
+- **Workspace banner**: When loading a conversation from another project, a banner appears with a one-click "Switch here" button
+- **Diff summary**: After each assistant response, a collapsible `Changes` section shows all file modifications with per-file line-number navigation
+- **Smart scrolling**: Browsing history won't be interrupted by new messages; auto-scroll only when already at the bottom
 
-- **User-level Skills**: discovered and activated from `~/.agents/skills/`.
-- **Project-level Skills**: loaded from `./.agents/skills/` for project-specific workflows, with legacy `./.deepcode/skills/` compatibility.
-
-### **Optimized for DeepSeek**
-- Specifically tuned for DeepSeek model performance.
-- Reduce costs by using [Context Caching](https://api-docs.deepseek.com/guides/kv_cache).
-- Natively supports [Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode) and Thinking Effort Control.
-
-## Supported Models
-
-- `deepseek-v4-pro` (Recommended)
-- `deepseek-v4-flash`
-- `deepseek-chat`
-- Any other OpenAI-compatible model
-
-## Screenshot
-
-![screenshot](resources/deepcode_screenshot.png)
-
-## Deep Code CLI
+## Build & Package
 
 ```bash
-npm install -g @vegamo/deepcode-cli
+# 1. Install dependencies
+npm install
+
+# 2. Compile
+npm run compile
+
+# 3. Package into .vsix (requires @vscode/vsce)
+npm install -g @vscode/vsce
+vsce package
+
+# 4. Share the generated .vsix file
 ```
 
-![intro1](https://raw.githubusercontent.com/lessweb/deepcode-cli/main/resources/intro1.png)
+The `.vsix` file can be installed by anyone via VSCode's `Extensions → ⋮ → Install from VSIX...`.
 
-> The VSCode plugin and CLI share configuration and data, but they have no dependencies at runtime.
-
-- GitHub： https://github.com/lessweb/deepcode-cli
-
-## FAQ
-
-### How can I move Deep Code from the left sidebar to the right (Secondary Side Bar) in VS Code?
-
-![faq1](resources/faq1.gif)
-
-### Does Deep Code support understanding images?
-
-Deep Code supports multimodal, but `deepseek-v4` does not support multimodal yet. Some models have multimodal capabilities but impose strict limits on multi-turn dialogue requests. For multimodal input, we recommend using the Volcano Ark `Doubao-Seed-2.0-pro` model, which has the best integration.
-
-### How to automatically send a Slack message after a task completes?
-
-Write a shell notification script that calls a Slack webhook, then set the `notify` field in `~/.deepcode/settings.json` to the full path of the script. For detailed steps, refer to: https://binfer.net/share/jby5xnc-so6g
-
-### Does it support Coding Plan?
-
-Yes. Just set `env.BASE_URL` in `~/.deepcode/settings.json` to an OpenAI-compatible API endpoint. Take Volcano Ark's Coding Plan as an example, configure `~/.deepcode/settings.json` as follows:
-
-```json
-{
-  "env": {
-    "MODEL": "ark-code-latest",
-    "BASE_URL": "https://ark.cn-beijing.volces.com/api/coding/v3",
-    "API_KEY": "**************"
-  },
-  "thinkingEnabled": true
-}
-```
-
-## Getting Help
-- Report bugs or request features on GitHub Issues (https://github.com/lessweb/deepcode/issues)
+No network or marketplace account needed — just give your colleague the `.vsix` file.

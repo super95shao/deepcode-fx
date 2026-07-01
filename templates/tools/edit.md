@@ -3,10 +3,12 @@
 Performs scoped string replacements in files.
 
 Usage:
-
-- You must use `Read` tool at least once in the conversation before editing to get the required `snippet_id`. This tool will error if you attempt an edit without reading the file.
-- `snippet_id` defines the search scope. Provide `file_path` only as an optional guard that the snippet belongs to the expected file.
+- You must use your `Read` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file. 
+- If your prior Read only covered part of the file, use the returned `snippet_id` to scope the edit, or read the full file before editing without a snippet.
 - When editing text from Read tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: spaces + line number + tab. Everything after that tab is the actual file content to match. Never include any part of the line number prefix in the old_string or new_string.
+- **Tab indentation risk**: For files that use tab indentation (e.g., Valve KV files, Lua files with tab indentation), copying the text from Read output verbatim is the only reliable way to match. Do not manually retype indentation — always copy the exact text from the Read output, including tabs. A single tab/space mismatch will cause the edit to fail silently.
+- **CRLF mismatch risk**: On Windows, many files use CRLF line endings, but the Read tool displays them normalized (without \\r). The Edit tool may fail to match old_string with CRLF content because the underlying file has \\r\\n while the old_string has \\n. If an edit keeps failing despite the text appearing correct, this is the most likely cause. The safest workaround is to use a Python script with byte-level replacement (`d.replace(b'\\r\\r\\n', b'\\r\\n')`), but do NOT use Python for code file modifications as it bypasses diff tracking. Instead, try to scope the edit to a smaller unique fragment to reduce the chance of line-ending mismatch.
+- Prefer passing `snippet_id` from a prior Read response when you want to limit the replacement to a known range.
 - ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
 - Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.
 - If `old_string` is not unique, the tool returns candidate matches with line ranges, previews, and snippet ids that you can reuse in a follow-up edit.
@@ -18,16 +20,16 @@ Usage:
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "snippet_id": {
-      "description": "Required snippet_id returned by Read or a prior Edit error response.",
+    "file_path": {
+      "description": "The absolute path to the file to modify (must be absolute, not relative). Optional when snippet_id is provided.",
       "type": "string"
     },
-    "file_path": {
-      "description": "Optional absolute path guard. If provided, it must match the snippet's file.",
+    "snippet_id": {
+      "description": "Snippet id returned by Read or a prior Edit error response. Limits the search range to that snippet.",
       "type": "string"
     },
     "old_string": {
-      "description": "The text to replace within the snippet_id scope",
+      "description": "The text to replace within the file or snippet scope",
       "type": "string"
     },
     "new_string": {
@@ -44,7 +46,10 @@ Usage:
       "type": "number"
     }
   },
-  "required": ["snippet_id", "old_string", "new_string"],
+  "required": [
+    "old_string",
+    "new_string"
+  ],
   "additionalProperties": false
 }
 ```

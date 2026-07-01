@@ -1,11 +1,40 @@
-# Deep Code
+# DeepCode FX
 
-[Deep Code](https://marketplace.visualstudio.com/items?itemName=vegamo.deepcode-vscode) 是 Visual Studio Code 的 AI 编码助手扩展，专门为最新的 `deepseek-v4` 模型优化。
+Forked from [DeepCode VSCode](https://marketplace.visualstudio.com/items?itemName=vegamo.deepcode-vscode)
+
+DeepCode FX 是基于 DeepCode VSCode 的增强 fork，在保留原版功能的基础上，增加了大量 UI 和交互优化。
+
+> 🧠 **趣事**：本插件就是用它自己（DeepSeek V4）开发的——AI 在写 AI 工具，够套娃的吧？
+
+## 与原版的差异
+
+| 功能 | 原版 | 本 Fork |
+|------|------|---------|
+| Diff 汇总 | 无 | 可折叠的 `Changes` 汇总，显示 `+N -M (N files)`，每个文件有独立的增删统计和可点击行号 |
+| 设置页面 | 无 | 插件内置设置界面，支持 Global / Project 折叠分区，API key、模型、思考开关等 |
+| 工作区切换 | 无 | 跨项目浏览所有对话记录；加载其他项目的对话时显示横幅提示，一键切换工作区 |
+| 模型快捷切换 | 无 | 底部工具栏下拉菜单，在 `pro` / `flash` 之间切换（同时保存到 global 和 project 配置） |
+| 思考强度快捷切换 | 无 | 底部工具栏下拉菜单，在 `max` / `high` 之间切换 |
+| 行号跳转 | 无 | 所有 diff 预览中的行号皆可点击，直接打开 VSCode 对应文件并跳转到该行 |
+| Diff 编辑匹配 | 基础精确匹配 | 逐行标准化对比：容忍 tab/空格缩进差异、行尾空白、Read 工具行号前缀 |
+| 智能滚屏 | 始终滚到底部 | 仅在用户位于底部时自动追底；初次加载和用户发消息时强制滚动 |
+| 模型支持 | 多模型 | 仅 DeepSeek (V4)，代码更精简 |
+| 中文界面 | 无 | 工具栏按钮在 VSCode 语言为中文时自动显示中文标签 |
+| 扩展 ID | `ccui.*` | `deepcode-fx.*` — 可与原版共存 |
+
+## 环境要求
+
+- VSCode ^1.85.0
+- DeepSeek API key
 
 ## 配置
 
-创建 `~/.deepcode/settings.json` 文件，内容如下：
+配置文件分两级（项目级覆盖全局级）：
 
+- **全局**: `~/.deepcode/settings.json`
+- **项目**: `{工作区根目录}/.deepcode/settings.json`
+
+示例：
 ```json
 {
   "env": {
@@ -18,77 +47,30 @@
 }
 ```
 
-## 主要功能
+## 快速上手
 
-### **Skills**
-Deep Code 支持 agent skills，允许您扩展助手的能力：
+- **工具栏下拉菜单**：切换模型和思考强度无需打开设置页
+- **设置齿轮**：管理全局/项目配置和工作区路径
+- **工作区横幅**：打开其他项目的对话时，顶部横幅提示，点击 `Switch here` 一键切换
+- **Diff 汇总**：每次回复后，折叠的 `Changes` 区域显示所有文件修改，每个文件标注 +/-
+- **智能滚屏**：查看旧消息不会被新消息打断
 
-- **User-level Skills**：从 `~/.agents/skills/` 目录中发现并激活 skills。
-- **Project-level Skills**：从 `./.agents/skills/` 目录中加载项目专属 skills，并兼容旧的 `./.deepcode/skills/` 目录。
-
-### **为 DeepSeek 优化**
-- 专门为 DeepSeek 模型性能调优。
-- 通过使用[上下文缓存](https://api-docs.deepseek.com/guides/kv_cache)来降低成本。
-- 原生支持[思考模式](https://api-docs.deepseek.com/guides/thinking_mode)和思考强度控制。
-
-## 支持的模型
-
-- `deepseek-v4-pro`（推荐使用）
-- `deepseek-v4-flash`
-- 任何其他 OpenAI 兼容模型
-
-## 截图示例
-
-![screenshot](resources/deepcode_screenshot.png)
-
-## Deep Code CLI
+## 构建与打包
 
 ```bash
-npm install -g @vegamo/deepcode-cli
+# 1. 安装依赖
+npm install
+
+# 2. 编译
+npm run compile
+
+# 3. 打包为 .vsix（需要 @vscode/vsce）
+npm install -g @vscode/vsce
+vsce package
+
+# 4. 分享生成的 .vsix 文件
 ```
 
-![intro1](https://raw.githubusercontent.com/lessweb/deepcode-cli/main/resources/intro1.png)
+其他人拿到 `.vsix` 文件后，通过 VSCode 的 `扩展 → ⋮ → Install from VSIX...` 安装即可。
 
-> VSCode插件和CLI共享配置文件和数据，但运行时没有依赖。
-
-- GitHub： https://github.com/lessweb/deepcode-cli
-
-## 常见问题
-
-### 如何将 Deep Code 从左侧边栏移动到右侧边栏（Secondary Side Bar）？
-
-![faq1](resources/faq1.gif)
-
-### Deep Code是否支持理解图片？
-
-Deep Code支持多模态，但目前deepseek-v4不支持多模态。有些模型虽然有多模态能力，但对多轮对话请求的限制太严。目前多模态输入推荐使用火山方舟的Doubao-Seed-2.0-pro模型，适配效果最好。
-
-### 怎样在任务完成后自动给Slack发消息？
-
-编写一个调用Slack webhook的Shell通知脚本，然后在`~/.deepcode/settings.json`中将`notify`字段设为该脚本的完整路径即可。详细步骤可参考：https://binfer.net/share/jby5xnc-so6g
-
-### 是否支持Coding Plan？
-
-支持。只要把`~/.deepcode/settings.json`的env.BASE_URL配置为OpenAI兼容的接口地址就行。以火山方舟的Coding Plan为例，`~/.deepcode/settings.json`这样配置：
-
-```json
-{
-  "env": {
-    "MODEL": "ark-code-latest",
-    "BASE_URL": "https://ark.cn-beijing.volces.com/api/coding/v3",
-    "API_KEY": "**************"
-  },
-  "thinkingEnabled": true
-}
-```
-
-## 获取帮助
-- 在 GitHub Issues 上报告错误或请求功能 (https://github.com/lessweb/deepcode/issues)
-
-## 支持我们
-
-如果你觉得这个插件对你有帮助，请考虑通过以下方式支持我们：
-
-- 在 GitHub 上给我们一个 Star (https://github.com/lessweb/deepcode)
-- 向我们提交反馈和建议
-- 分享给你的朋友和同事
+不需要市场上架，也不需要联网账号，直接把 `.vsix` 发给同事就行。

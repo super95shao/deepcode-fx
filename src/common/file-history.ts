@@ -1,31 +1,13 @@
 import * as childProcess from "child_process";
-import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 
 const FILE_HISTORY_AUTHOR_NAME = "DeepCode Checkpoint";
 const FILE_HISTORY_AUTHOR_EMAIL = "deepcode-checkpoint@localhost";
-const MANIFEST_PATH = ".deepcode-file-history.json";
-
-type FileHistoryEntry = {
-  path: string;
-  blob: string | null;
-  mode: "100644";
-};
-
-type FileHistoryManifest = {
-  version: 1 | 2;
-  files: Record<string, FileHistoryEntry>;
-};
-
-export type FileHistoryCheckpointResult = {
-  checkpointHash: string | undefined;
-  changedFilePaths: string[];
-};
 
 export class GitFileHistory {
   constructor(
-    _projectRoot: string,
+    private readonly projectRoot: string,
     private readonly gitDir: string
   ) {}
 
@@ -38,7 +20,7 @@ export class GitFileHistory {
     try {
       if (!fs.existsSync(this.gitDir)) {
         fs.mkdirSync(path.dirname(this.gitDir), { recursive: true });
-        this.runGit(["init"]);
+        this.runGit(["init"], { includeWorkTree: true });
       }
 
       const current = this.getCurrentCheckpointHash(sessionId);
@@ -46,9 +28,9 @@ export class GitFileHistory {
         return current;
       }
 
-      const treeHash = this.createTree(emptyManifest());
-      const commitHash = this.createCommit(treeHash, null, "Initial checkpoint");
-      this.runGit(["update-ref", branchRef, commitHash]);
+      const emptyTree = this.runGit(["mktree"], { includeWorkTree: false, input: "" }).trim();
+      const commitHash = this.createCommit(emptyTree, null, "Initial checkpoint");
+      this.runGit(["update-ref", branchRef, commitHash], { includeWorkTree: false });
       return commitHash;
     } catch {
       return undefined;
@@ -62,7 +44,9 @@ export class GitFileHistory {
     }
 
     try {
-      const hash = this.runGit(["rev-parse", "--verify", `${branchRef}^{commit}`]).trim();
+      const hash = this.runGit(["rev-parse", "--verify", `${branchRef}^{commit}`], {
+        includeWorkTree: false,
+      }).trim();
       return isCommitHash(hash) ? hash : undefined;
     } catch {
       return undefined;
@@ -75,8 +59,10 @@ export class GitFileHistory {
       return undefined;
     }
 
-    const absolutePaths = uniqueAbsolutePaths(filePaths);
-    if (absolutePaths.length === 0) {
+    const relativePaths = filePaths
+      .map((filePath) => this.toProjectRelativeGitPath(filePath))
+      .filter((filePath): filePath is string => Boolean(filePath));
+    if (relativePaths.length === 0) {
       return this.getCurrentCheckpointHash(sessionId);
     }
 
@@ -85,67 +71,21 @@ export class GitFileHistory {
       if (!parentHash) {
         return undefined;
       }
-
-      const manifest = this.readManifest(parentHash);
-      for (const filePath of absolutePaths) {
-        const key = this.getFileKey(filePath);
-        if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-          manifest.files[key] = {
-            path: filePath,
-            blob: null,
-            mode: "100644",
-          };
-          continue;
-        }
-
-        manifest.files[key] = {
-          path: filePath,
-          blob: this.hashFile(filePath),
-          mode: "100644",
-        };
-      }
-
-      const treeHash = this.createTree(manifest);
-      const parentTreeHash = this.runGit(["rev-parse", `${parentHash}^{tree}`]).trim();
+      this.runGit(["read-tree", "--reset", branchRef], { includeWorkTree: true });
+      this.runGit(["add", "-f", "-A", "--", ...relativePaths], { includeWorkTree: true });
+      const treeHash = this.runGit(["write-tree"], { includeWorkTree: false }).trim();
+      const parentTreeHash = this.runGit(["rev-parse", `${parentHash}^{tree}`], {
+        includeWorkTree: false,
+      }).trim();
       if (treeHash === parentTreeHash) {
         return parentHash;
       }
 
       const commitHash = this.createCommit(treeHash, parentHash, message);
-      this.runGit(["update-ref", branchRef, commitHash, parentHash]);
+      this.runGit(["update-ref", branchRef, commitHash, parentHash], { includeWorkTree: false });
       return commitHash;
     } catch {
       return undefined;
-    }
-  }
-
-  recordTrackedFilesCheckpoint(sessionId: string, message: string): FileHistoryCheckpointResult {
-    const currentHash = this.ensureSession(sessionId);
-    if (!currentHash) {
-      return { checkpointHash: undefined, changedFilePaths: [] };
-    }
-
-    try {
-      const manifest = this.readManifest(currentHash);
-      const trackedPaths = Object.values(manifest.files)
-        .map((entry) => entry.path)
-        .sort((left, right) => left.localeCompare(right));
-      if (trackedPaths.length === 0) {
-        return { checkpointHash: currentHash, changedFilePaths: [] };
-      }
-      const nextHash = this.recordCheckpoint(sessionId, trackedPaths, message);
-      if (!nextHash) {
-        return { checkpointHash: undefined, changedFilePaths: [] };
-      }
-
-      const nextManifest = this.readManifest(nextHash);
-      const changedFilePaths = Object.entries(manifest.files)
-        .filter(([key, entry]) => !isSameFileHistoryEntry(entry, nextManifest.files[key]))
-        .map(([key, entry]) => nextManifest.files[key]?.path ?? entry.path)
-        .sort((left, right) => left.localeCompare(right));
-      return { checkpointHash: nextHash, changedFilePaths };
-    } catch {
-      return { checkpointHash: undefined, changedFilePaths: [] };
     }
   }
 
@@ -161,8 +101,7 @@ export class GitFileHistory {
     }
 
     try {
-      this.runGit(["cat-file", "-e", `${checkpointHash}^{commit}`]);
-      this.readManifest(checkpointHash);
+      this.runGit(["cat-file", "-e", `${checkpointHash}^{commit}`], { includeWorkTree: false });
       return true;
     } catch {
       return false;
@@ -177,55 +116,16 @@ export class GitFileHistory {
     if (!branchRef || !fs.existsSync(this.gitDir)) {
       throw new Error("File history Git repository was not found for this project.");
     }
-    this.runGit(["cat-file", "-e", `${checkpointHash}^{commit}`]);
+    this.runGit(["cat-file", "-e", `${checkpointHash}^{commit}`], { includeWorkTree: false });
 
-    const currentHash = this.getCurrentCheckpointHash(sessionId);
-    const currentManifest = currentHash ? this.readManifest(currentHash) : emptyManifest();
-    const targetManifest = this.readManifest(checkpointHash);
-
-    for (const [key, entry] of Object.entries(currentManifest.files)) {
-      if (!targetManifest.files[key]) {
-        this.restoreFirstKnownEntry(currentHash, key, entry.path);
-      }
+    try {
+      this.runGit(["read-tree", "--reset", branchRef], { includeWorkTree: true });
+    } catch {
+      // If the session branch is missing, fall back to the target tree only.
+      // The target checkpoint has already been validated above.
     }
-
-    for (const entry of Object.values(targetManifest.files)) {
-      if (!entry.blob) {
-        removeTrackedFile(entry.path);
-        continue;
-      }
-      fs.mkdirSync(path.dirname(entry.path), { recursive: true });
-      fs.writeFileSync(entry.path, this.readBlob(entry.blob));
-    }
-
-    this.runGit(["update-ref", branchRef, checkpointHash]);
-  }
-
-  private restoreFirstKnownEntry(currentHash: string | undefined, key: string, fallbackPath: string): void {
-    const firstEntry = currentHash ? this.findFirstKnownEntry(currentHash, key) : undefined;
-    const entry = firstEntry ?? { path: fallbackPath, blob: null, mode: "100644" as const };
-    if (!entry.blob) {
-      removeTrackedFile(entry.path);
-      return;
-    }
-
-    fs.mkdirSync(path.dirname(entry.path), { recursive: true });
-    fs.writeFileSync(entry.path, this.readBlob(entry.blob));
-  }
-
-  private findFirstKnownEntry(currentHash: string, key: string): FileHistoryEntry | undefined {
-    const commitHashes = this.runGit(["rev-list", "--reverse", currentHash])
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(isCommitHash);
-
-    for (const commitHash of commitHashes) {
-      const entry = this.readManifest(commitHash).files[key];
-      if (entry) {
-        return entry;
-      }
-    }
-    return undefined;
+    this.runGit(["read-tree", "--reset", "-u", checkpointHash], { includeWorkTree: true });
+    this.runGit(["update-ref", branchRef, checkpointHash], { includeWorkTree: false });
   }
 
   private getSessionBranchRef(sessionId: string): string | null {
@@ -242,145 +142,41 @@ export class GitFileHistory {
     }
     args.push("-m", message);
     return this.runGit(args, {
+      includeWorkTree: false,
       env: getFileHistoryGitEnv(),
     }).trim();
   }
 
-  private createTree(manifest: FileHistoryManifest): string {
-    const normalizedManifest = normalizeManifest(manifest);
-    const manifestBlob = this.hashContent(`${JSON.stringify(normalizedManifest, null, 2)}\n`);
-    const entries: string[] = [`100644 blob ${manifestBlob}\t${MANIFEST_PATH}\0`];
-
-    for (const [key, entry] of Object.entries(normalizedManifest.files)) {
-      if (!entry.blob) {
-        continue;
-      }
-      entries.push(`${entry.mode} blob ${entry.blob}\t${key}\0`);
+  private toProjectRelativeGitPath(filePath: string): string | null {
+    const absolutePath = path.resolve(filePath);
+    const relativePath = path.relative(this.projectRoot, absolutePath);
+    if (!relativePath || relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+      return null;
     }
-
-    return this.runGit(["mktree", "-z"], { input: entries.join("") }).trim();
+    return relativePath.split(path.sep).join("/");
   }
 
-  private readManifest(commitHash: string): FileHistoryManifest {
-    const buffer = this.runGitBuffer(["cat-file", "blob", `${commitHash}:${MANIFEST_PATH}`]);
-    const parsed = JSON.parse(buffer.toString("utf8")) as FileHistoryManifest;
-    if (
-      !parsed ||
-      (parsed.version !== 1 && parsed.version !== 2) ||
-      !parsed.files ||
-      typeof parsed.files !== "object"
-    ) {
-      throw new Error("Invalid file history manifest.");
-    }
-    return normalizeManifest(parsed);
-  }
-
-  private readBlob(blobHash: string): Buffer {
-    if (!isCommitHash(blobHash)) {
-      throw new Error("Invalid file history blob hash.");
-    }
-    return this.runGitBuffer(["cat-file", "blob", blobHash]);
-  }
-
-  private hashFile(filePath: string): string {
-    const blobHash = this.runGit(["hash-object", "-w", "--", filePath]).trim();
-    if (!isCommitHash(blobHash)) {
-      throw new Error("Invalid file history blob hash.");
-    }
-    return blobHash;
-  }
-
-  private hashContent(content: string): string {
-    const blobHash = this.runGit(["hash-object", "-w", "--stdin"], { input: content }).trim();
-    if (!isCommitHash(blobHash)) {
-      throw new Error("Invalid file history blob hash.");
-    }
-    return blobHash;
-  }
-
-  private getFileKey(filePath: string): string {
-    const hash = crypto.createHash("sha256").update(filePath).digest("hex");
-    return `files-${hash}`;
-  }
-
-  private runGit(args: string[], options: { input?: string | Buffer; env?: NodeJS.ProcessEnv } = {}): string {
-    return this.spawnGit(args, options, "utf8") as string;
-  }
-
-  private runGitBuffer(args: string[], options: { input?: string | Buffer; env?: NodeJS.ProcessEnv } = {}): Buffer {
-    return this.spawnGit(args, options, "buffer") as Buffer;
-  }
-
-  private spawnGit(
+  private runGit(
     args: string[],
-    options: { input?: string | Buffer; env?: NodeJS.ProcessEnv },
-    encoding: BufferEncoding | "buffer"
-  ): string | Buffer {
-    const gitArgs = ["-c", "core.autocrlf=false", "-c", "core.eol=lf", `--git-dir=${this.gitDir}`, ...args];
+    options: { includeWorkTree: boolean; input?: string; env?: NodeJS.ProcessEnv }
+  ): string {
+    const gitArgs = ["-c", "core.autocrlf=false", "-c", "core.eol=lf", `--git-dir=${this.gitDir}`];
+    if (options.includeWorkTree) {
+      gitArgs.push(`--work-tree=${this.projectRoot}`);
+    }
+    gitArgs.push(...args);
     const result = childProcess.spawnSync("git", gitArgs, {
-      encoding,
+      encoding: "utf8",
       input: options.input,
       env: options.env,
       stdio: ["pipe", "pipe", "pipe"],
     });
     if (result.status !== 0) {
-      const stderr = Buffer.isBuffer(result.stderr) ? result.stderr.toString("utf8") : result.stderr;
-      const stdout = Buffer.isBuffer(result.stdout) ? result.stdout.toString("utf8") : result.stdout;
-      const detail = (stderr || stdout || "").trim();
+      const detail = (result.stderr || result.stdout || "").trim();
       throw new Error(detail || `git ${args.join(" ")} failed`);
     }
-    return result.stdout ?? (encoding === "buffer" ? Buffer.alloc(0) : "");
+    return result.stdout ?? "";
   }
-}
-
-function emptyManifest(): FileHistoryManifest {
-  return { version: 2, files: {} };
-}
-
-function normalizeManifest(manifest: FileHistoryManifest): FileHistoryManifest {
-  const files: Record<string, FileHistoryEntry> = {};
-  for (const [key, entry] of Object.entries(manifest.files).sort(([left], [right]) => left.localeCompare(right))) {
-    if (
-      !isValidStoredPath(key) ||
-      !entry ||
-      entry.mode !== "100644" ||
-      (entry.blob !== null && !isCommitHash(entry.blob))
-    ) {
-      throw new Error("Invalid file history manifest.");
-    }
-    files[key] = {
-      path: path.resolve(entry.path),
-      blob: entry.blob,
-      mode: "100644",
-    };
-  }
-  return { version: 2, files };
-}
-
-function isSameFileHistoryEntry(left: FileHistoryEntry, right: FileHistoryEntry | undefined): boolean {
-  if (!right) {
-    return false;
-  }
-  return left.path === right.path && left.blob === right.blob && left.mode === right.mode;
-}
-
-function uniqueAbsolutePaths(filePaths: string[]): string[] {
-  return Array.from(new Set(filePaths.map((filePath) => path.resolve(filePath))));
-}
-
-function isValidStoredPath(value: string): boolean {
-  return /^files-[0-9a-f]{64}$/.test(value);
-}
-
-function removeTrackedFile(filePath: string): void {
-  if (!fs.existsSync(filePath)) {
-    return;
-  }
-  const stat = fs.lstatSync(filePath);
-  if (stat.isDirectory()) {
-    return;
-  }
-  fs.unlinkSync(filePath);
 }
 
 function getFileHistoryGitEnv(): NodeJS.ProcessEnv {

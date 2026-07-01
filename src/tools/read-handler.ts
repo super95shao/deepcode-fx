@@ -3,15 +3,9 @@ import * as path from "path";
 import ignore from "ignore";
 import type { ToolExecutionContext, ToolExecutionFollowUpMessage, ToolExecutionResult } from "./executor";
 import { readTextFileWithMetadata } from "../common/file-utils";
-import {
-  createFullFileSnippet,
-  createSnippet,
-  isAbsoluteFilePath,
-  markFileRead,
-  normalizeFilePath,
-} from "../common/state";
+import { createSnippet, isAbsoluteFilePath, markFileRead, normalizeFilePath } from "../common/state";
 
-const DEFAULT_LINE_LIMIT = 2000;
+const DEFAULT_LINE_LIMIT = 10000;
 const MAX_LINE_LENGTH = 2000;
 const PDF_LARGE_PAGE_THRESHOLD = 10;
 const PDF_MAX_PAGE_RANGE = 20;
@@ -255,9 +249,13 @@ export async function handleReadTool(
       encoding: textResult.encoding,
       lineEndings: textResult.lineEndings,
     });
-    const snippet = textResult.isPartialView
-      ? createSnippet(context.sessionId, filePath, textResult.startLine, textResult.endLine, textResult.output)
-      : createFullFileSnippet(context.sessionId, filePath, textResult.startLine, textResult.endLine, textResult.output);
+    const snippet = createSnippet(
+      context.sessionId,
+      filePath,
+      textResult.startLine,
+      textResult.endLine,
+      textResult.output
+    );
     return {
       ok: true,
       name: "read",

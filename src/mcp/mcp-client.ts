@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "child_process";
 import { createInterface, type Interface } from "readline";
+import * as os from "os";
 import * as path from "path";
 import { killProcessTree } from "../common/process-tree";
 
@@ -96,13 +97,6 @@ type ReadResourceResult = {
 
 export type McpNotificationHandler = (method: string, params?: Record<string, unknown>) => void;
 
-export type McpSpawnSpec = {
-  command: string;
-  args: string[];
-  shell: boolean;
-  windowsHide?: boolean;
-};
-
 export class McpClient {
   private process: ChildProcess | null = null;
   private reader: Interface | null = null;
@@ -136,14 +130,25 @@ export class McpClient {
         ...this.env,
       };
       const args = this.withNpxYesArg(this.command, this.args);
-      const spawnSpec = createMcpSpawnSpec(this.command, args);
 
-      this.process = spawn(spawnSpec.command, spawnSpec.args, {
-        stdio: ["pipe", "pipe", "pipe"],
-        env: childEnv,
-        shell: spawnSpec.shell,
-        windowsHide: spawnSpec.windowsHide,
-      });
+      const isWindows = os.platform() === "win32";
+
+      if (isWindows) {
+        // On Windows, shell: true lets cmd.exe resolve the command via
+        // PATHEXT (npx → npx.cmd, etc.) without blindly appending .cmd,
+        // which would break absolute paths like process.execPath.
+        this.process = spawn(this.command, args, {
+          stdio: ["pipe", "pipe", "pipe"],
+          env: childEnv,
+          shell: true,
+          windowsHide: true,
+        });
+      } else {
+        this.process = spawn(this.command, args, {
+          stdio: ["pipe", "pipe", "pipe"],
+          env: childEnv,
+        });
+      }
 
       let resolved = false;
       const safeReject = (err: Error) => {
@@ -415,37 +420,4 @@ export class McpClient {
     const stderr = this.stderrBuffer.trim();
     return new Error(stderr ? `${message}. stderr: ${stderr}` : message);
   }
-}
-
-export function createMcpSpawnSpec(
-  command: string,
-  args: string[],
-  platform: NodeJS.Platform = process.platform
-): McpSpawnSpec {
-  if (platform === "win32") {
-    return {
-      // On Windows, shell: true lets cmd.exe resolve the command via PATHEXT
-      // (npx -> npx.cmd, etc.). Join command and args into a single string
-      // with empty spawn args to avoid Node 24 DEP0190.
-      // Only quote arguments that need protection from cmd.exe to prevent
-      // double-wrapping by Node.js's own shell quoting.
-      command: [command, ...args].map(quoteWindowsArgIfNeeded).join(" "),
-      args: [],
-      shell: true,
-      windowsHide: true,
-    };
-  }
-
-  return {
-    command,
-    args,
-    shell: false,
-  };
-}
-
-function quoteWindowsArgIfNeeded(arg: string): string {
-  if (/[\s"&|<>^()]/.test(arg)) {
-    return `"${arg.replace(/(\\*)"/g, '$1$1\\"').replace(/\\+$/g, "$&$&")}"`;
-  }
-  return arg;
 }

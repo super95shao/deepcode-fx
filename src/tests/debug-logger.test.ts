@@ -7,12 +7,8 @@ import { getDebugLogPath, logOpenAIChatCompletionDebug } from "../common/debug-l
 
 test("debug logger appends full entries without rotation", () => {
   const originalHome = process.env.HOME;
-  const originalUserProfile = process.env.USERPROFILE;
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "deepcode-debug-log-home-"));
   process.env.HOME = home;
-  if (process.platform === "win32") {
-    process.env.USERPROFILE = home;
-  }
   try {
     for (let index = 0; index < 25; index += 1) {
       logOpenAIChatCompletionDebug({
@@ -45,11 +41,6 @@ test("debug logger appends full entries without rotation", () => {
       delete process.env.HOME;
     } else {
       process.env.HOME = originalHome;
-    }
-    if (originalUserProfile === undefined) {
-      delete process.env.USERPROFILE;
-    } else {
-      process.env.USERPROFILE = originalUserProfile;
     }
   }
 });

@@ -6,10 +6,10 @@ Assume this tool is able to read all files on the machine. If the User provides 
 Usage:
 - The file_path parameter must be a UNIX-style file path.
 - By default, it reads up to 2000 lines starting from the beginning of the file
-- You can optionally specify a line offset and limit (especially handy for long files), but it's recommended to read the whole file by not providing these parameters
+- If you need to read only part of a file, use offset and limit. However, prefer reading the full file (no offset/limit) — partial reads cause Edit tool errors and full reads are required for Write operations. Only use offset/limit when the file is confirmed to be very large (e.g., > 2000 lines).
 - Any lines longer than 2000 characters will be truncated
 - Results are returned using cat -n format, with line numbers starting at 1
-- Text reads return a snippet id for Edit: full-file reads use ids like `full_file_0`; partial reads use ids like `snippet_1`.
+- Text reads return a snippet id in metadata. You can pass that snippet id to the Edit tool to constrain replacements to just that read range.
 <%_ if (supportsMultimodal) { _%>
 - This tool allows you to read images (eg PNG, JPG, etc). When reading an image file the contents are presented visually as Deepseek is a multimodal LLM.
 <%_ } else { _%>

@@ -9,7 +9,7 @@ import {
   readTextFileWithMetadata,
   writeTextFile,
 } from "../common/file-utils";
-import { executeValidatedTool } from "../common/validate";
+import { executeValidatedTool } from "../common/runtime";
 import { getFileState, isAbsoluteFilePath, isFullFileView, normalizeFilePath, recordFileState } from "../common/state";
 
 const writeSchema = z.strictObject({

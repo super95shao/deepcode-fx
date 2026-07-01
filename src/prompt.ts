@@ -2,12 +2,11 @@ import { execFileSync, execSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import ejs from "ejs";
-import matter from "gray-matter";
 import { fileURLToPath } from "url";
+import ejs from "ejs";
 import type { SessionMessage } from "./session";
 import { findGitBashPath, resolveShellPath } from "./common/shell-utils";
-import { supportsMultimodal } from "./common/model-capabilities";
+
 
 const COMPACT_PROMPT_BASE = `Your task is to create a detailed summary of the conversation so far, paying close attention to the user's explicit requests and your previous actions.
 This summary should be thorough in capturing technical details, code patterns, and architectural decisions that would be essential for continuing development work without losing context.
@@ -100,35 +99,7 @@ type PromptToolOptions = {
   webSearchEnabled?: boolean;
 };
 
-type DefaultSkillPromptOptions = {
-  enabledSkills?: Record<string, boolean>;
-};
-
-const DEFAULT_SKILL_TEMPLATES = ["karpathy-guidelines.md"];
-const DEFAULT_SKILL_RESOURCE_FILE_LIMIT = 50;
-const SKILL_RESOURCE_EXCLUDED_DIRS = new Set([
-  ".cache",
-  ".git",
-  ".next",
-  ".turbo",
-  "build",
-  "coverage",
-  "dist",
-  "node_modules",
-  "out",
-]);
-
-export type SkillPromptDocument = {
-  name: string;
-  content: string;
-  path?: string;
-  skillFilePath?: string;
-};
-
-type SkillResourceListing = {
-  files: string[];
-  truncated: boolean;
-};
+const DEFAULT_SKILL_TEMPLATES = ["agent-drift-guard.md", "plan-and-execute.md"];
 
 function readToolDocs(extensionRoot: string, options: PromptToolOptions = {}): string {
   const toolsDir = path.join(extensionRoot, "templates", "tools");
@@ -145,7 +116,7 @@ function readToolDocs(extensionRoot: string, options: PromptToolOptions = {}): s
       try {
         const template = fs.readFileSync(fullPath, "utf8");
         const content = entry.endsWith(".ejs")
-          ? ejs.render(template, { supportsMultimodal: supportsMultimodal(options.model ?? "") })
+          ? ejs.render(template, { supportsMultimodal: false })
           : template;
         return content.trim();
       } catch {
@@ -157,20 +128,13 @@ function readToolDocs(extensionRoot: string, options: PromptToolOptions = {}): s
   return docs.join("\n\n");
 }
 
-function readDefaultSkillDocs(
-  extensionRoot: string,
-  enabledSkills: Record<string, boolean> = {}
-): Array<{ name: string; content: string }> {
+function readDefaultSkillDocs(extensionRoot: string): Array<{ name: string; content: string }> {
   const skillsDir = path.join(extensionRoot, "templates", "skills");
   return DEFAULT_SKILL_TEMPLATES.map((entry) => {
     const fullPath = path.join(skillsDir, entry);
-    const name = path.basename(entry, ".md");
-    if (enabledSkills[name] === false) {
-      return null;
-    }
     try {
       return {
-        name,
+        name: path.basename(entry, ".md"),
         content: fs.readFileSync(fullPath, "utf8").trim(),
       };
     } catch {
@@ -179,119 +143,18 @@ function readDefaultSkillDocs(
   }).filter((skill): skill is { name: string; content: string } => Boolean(skill?.content));
 }
 
-export function getDefaultSkillPrompt(options: DefaultSkillPromptOptions = {}): string {
-  const skillDocs = readDefaultSkillDocs(getExtensionRoot(), options.enabledSkills);
+export function getDefaultSkillPrompt(): string {
+  const skillDocs = readDefaultSkillDocs(getExtensionRoot());
   if (skillDocs.length === 0) {
     return "";
   }
 
-  return buildSkillDocumentsPrompt(skillDocs);
-}
-
-export function buildSkillDocumentsPrompt(skills: SkillPromptDocument[]): string {
-  const blocks = skills.map((skill) => renderSkillDocumentBlock(skill));
+  const blocks = skillDocs.map(
+    (skill) => `<${skill.name}-skill>
+${skill.content}
+</${skill.name}-skill>`
+  );
   return `Use the skill documents below to assist the user:\n${blocks.join("\n\n")}`;
-}
-
-function renderSkillDocumentBlock(skill: SkillPromptDocument): string {
-  const pathAttribute = skill.path ? ` path="${escapeXml(skill.path)}"` : "";
-  const resources = renderSkillResources(skill.skillFilePath);
-  const content = stripSkillPromptMetadata(skill.content);
-  return `<${skill.name}-skill${pathAttribute}>
-${content}${resources}
-</${skill.name}-skill>`;
-}
-
-function stripSkillPromptMetadata(content: string): string {
-  try {
-    const parsed = matter(content);
-    if (!Object.prototype.hasOwnProperty.call(parsed.data, "metadata")) {
-      return content;
-    }
-
-    const frontmatter = { ...parsed.data };
-    delete frontmatter.metadata;
-    return matter.stringify(parsed.content, frontmatter);
-  } catch {
-    return content;
-  }
-}
-
-function renderSkillResources(skillFilePath?: string): string {
-  if (!skillFilePath) {
-    return "";
-  }
-
-  const listing = listSkillResourceFiles(skillFilePath, DEFAULT_SKILL_RESOURCE_FILE_LIMIT);
-  if (listing.files.length === 0 && !listing.truncated) {
-    return "";
-  }
-
-  const fileLines = listing.files.map((file) => `  <file>${escapeXml(file)}</file>`);
-  const noteLine = listing.truncated
-    ? [`  <note>Listing capped at ${DEFAULT_SKILL_RESOURCE_FILE_LIMIT} files and may be incomplete.</note>`]
-    : [];
-  return `\n\n<skill_resources>\n${[...fileLines, ...noteLine].join("\n")}\n</skill_resources>`;
-}
-
-function listSkillResourceFiles(skillFilePath: string, limit: number): SkillResourceListing {
-  const skillDir = path.dirname(skillFilePath);
-  const files: string[] = [];
-  let truncated = false;
-
-  const visit = (dir: string, relativeDir = ""): void => {
-    if (files.length > limit) {
-      truncated = true;
-      return;
-    }
-
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
-    } catch {
-      return;
-    }
-
-    for (const entry of entries) {
-      if (entry.name.startsWith(".")) {
-        continue;
-      }
-
-      const relativePath = relativeDir ? path.join(relativeDir, entry.name) : entry.name;
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (SKILL_RESOURCE_EXCLUDED_DIRS.has(entry.name)) {
-          continue;
-        }
-        visit(fullPath, relativePath);
-        if (truncated) {
-          return;
-        }
-        continue;
-      }
-
-      if (!entry.isFile() || entry.name === "SKILL.md") {
-        continue;
-      }
-
-      files.push(toPosixPath(relativePath));
-      if (files.length > limit) {
-        truncated = true;
-        return;
-      }
-    }
-  };
-
-  visit(skillDir);
-  return { files: files.slice(0, limit), truncated };
-}
-
-function toPosixPath(filePath: string): string {
-  return filePath.split(path.sep).join("/");
-}
-
-function escapeXml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function getCurrentDateAndModelPrompt(model?: string): string {
@@ -303,7 +166,8 @@ function getCurrentDateAndModelPrompt(model?: string): string {
 
 export function getSystemPrompt(_projectRoot: string, options: PromptToolOptions = {}): string {
   const toolDocs = readToolDocs(getExtensionRoot(), options);
-  return toolDocs ? `${SYSTEM_PROMPT_BASE}\n\n# Available Tools\n\n${toolDocs}` : SYSTEM_PROMPT_BASE;
+  const basePrompt = toolDocs ? `${SYSTEM_PROMPT_BASE}\n\n# Available Tools\n\n${toolDocs}` : SYSTEM_PROMPT_BASE;
+  return basePrompt;
 }
 
 export function getCompactPrompt(sessionMessages: SessionMessage[]): string {
@@ -423,7 +287,7 @@ function getUnameInfo(): string {
   }
 }
 
-export function getExtensionRoot(): string {
+function getExtensionRoot(): string {
   // Prefer `__dirname` which is always available in the CJS bundle output.
   // Fall back to `import.meta.url` for ESM test environments (tsx --test).
   if (typeof __dirname !== "undefined") {
@@ -467,34 +331,8 @@ export function getTools(_options: PromptToolOptions = {}, externalTools: ToolDe
               description:
                 'Clear, concise description of what this command does in active voice. Never use words like "complex" or "risk" in the description - just describe what it does.',
             },
-            sideEffects: {
-              description:
-                'Permission scopes required by this bash command. Use [] only for commands that do not read, write, delete, or access the network. Use ["unknown"] when the effects cannot be classified safely.',
-              type: "array",
-              items: {
-                type: "string",
-                enum: [
-                  "read-in-cwd",
-                  "read-out-cwd",
-                  "write-in-cwd",
-                  "write-out-cwd",
-                  "delete-in-cwd",
-                  "delete-out-cwd",
-                  "query-git-log",
-                  "mutate-git-log",
-                  "network",
-                  "unknown",
-                ],
-              },
-              uniqueItems: true,
-            },
-            run_in_background: {
-              type: "boolean",
-              description:
-                "Set to true to run the command in the background. Use this only when you need to perform a blocking task and do not need the result immediately.",
-            },
           },
-          required: ["command", "sideEffects"],
+          required: ["command"],
           additionalProperties: false,
         },
       },
@@ -635,17 +473,18 @@ export function getTools(_options: PromptToolOptions = {}, externalTools: ToolDe
         parameters: {
           type: "object",
           properties: {
-            snippet_id: {
-              type: "string",
-              description: "Required Read/Edit snippet_id.",
-            },
             file_path: {
               type: "string",
-              description: "Optional absolute path guard; must match snippet_id's file.",
+              description: "Absolute path to file. Optional when snippet_id is provided.",
+            },
+            snippet_id: {
+              type: "string",
+              description:
+                "Snippet id returned by the Read or Edit tool to scope the search range after a partial read.",
             },
             old_string: {
               type: "string",
-              description: "Exact text to replace inside snippet_id's scope",
+              description: "Exact text to replace inside the file or snippet scope",
             },
             new_string: {
               type: "string",
@@ -661,7 +500,7 @@ export function getTools(_options: PromptToolOptions = {}, externalTools: ToolDe
               description: "Expected number of matches, especially useful as a safety check with replace_all",
             },
           },
-          required: ["snippet_id", "old_string", "new_string"],
+          required: ["old_string", "new_string"],
           additionalProperties: false,
         },
       },

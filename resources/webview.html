@@ -7,7 +7,7 @@
       content="default-src 'none'; img-src {{cspSource}} data: blob:; style-src {{cspSource}} 'unsafe-inline'; script-src {{cspSource}} 'nonce-{{nonce}}';"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Deep Code</title>
+    <title>DeepCode FX</title>
     <link rel="stylesheet" href="{{cssUri}}" />
   </head>
   <body>
@@ -17,7 +17,7 @@
           <div class="session-selector" id="sessionSelector">
             <div class="session-selector-title" id="sessionSelectorTitle">
               <img class="session-logo" src="{{iconUri}}" alt="" />
-              <span class="session-title-text" id="sessionSelectorTitleText">Deep Code</span>
+              <span class="session-title-text" id="sessionSelectorTitleText">DeepCode FX</span>
             </div>
             <svg class="session-selector-icon" viewBox="0 0 1024 1024" aria-hidden="true">
               <path
@@ -27,7 +27,13 @@
           </div>
         </div>
         <button class="header-new-btn" id="newSessionBtn" title="New chat">
-          <svg class="header-new-icon" viewBox="0 0 1024 1024" width="16" height="16" aria-hidden="true">
+          <svg
+            class="header-new-icon"
+            viewBox="0 0 1024 1024"
+            width="16"
+            height="16"
+            aria-hidden="true"
+          >
             <path d="M474 152m8 0l60 0q8 0 8 8l0 704q0 8-8 8l-60 0q-8 0-8-8l0-704q0-8 8-8Z"></path>
             <path d="M168 474m8 0l672 0q8 0 8 8l0 60q0 8-8 8l-672 0q-8 0-8-8l0-60q0-8 8-8Z"></path>
           </svg>
@@ -35,16 +41,29 @@
         <div class="session-dropdown" id="sessionDropdown"></div>
       </div>
 
+      <!-- 跨工作区提示横幅 -->
+      <div class="workspace-banner" id="workspaceBanner" style="display:none">
+        <span class="workspace-banner-icon">⚡</span>
+        <span class="workspace-banner-text">
+          This conversation belongs to: <strong class="workspace-banner-path"></strong>
+        </span>
+        <button class="workspace-banner-btn" id="workspaceSwitchBtn">Switch here</button>
+        <button class="workspace-banner-close" id="workspaceBannerClose">✕</button>
+      </div>
+
       <!-- 聊天视图 -->
       <div class="chat-container" id="chatContainer">
         <div class="messages" id="messages"></div>
+        <div class="loading" id="loading">
+          <div class="spinner"></div>
+          <span>Thinking...</span>
+        </div>
         <div class="composer">
           <!-- Skills Popup -->
           <div class="skills-popup" id="skillsPopup">
             <div class="skills-popup-header">Select Skills</div>
             <div class="skills-popup-list" id="skillsPopupList"></div>
           </div>
-          <div class="permission-prompt-host" id="permissionPromptHost" hidden></div>
           <div class="input-wrap">
             <div class="tools-line"></div>
             <textarea id="prompt" placeholder="Write a prompt..." rows="3"></textarea>
@@ -62,8 +81,34 @@
                   <div class="context-meter-ring" id="contextMeterRing"></div>
                   <div class="context-meter-tooltip" id="contextMeterTooltip" role="tooltip"></div>
                 </div>
+                <button class="toolbar-btn" id="compactBtn" title="Compact context">🗜</button>
+                <button class="toolbar-btn" id="settingsBtn" title="Settings">
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81a.48.48 0 0 0-.47-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.03-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/>
+                  </svg>
+                </button>
+                <div class="toolbar-dropdown" id="modelDropdownWrap">
+                  <button class="toolbar-btn" id="modelToggleBtn" title="Switch model">Model: pro</button>
+                  <div class="toolbar-popup" id="modelPopup">
+                    <div class="toolbar-popup-item" data-val="deepseek-v4-pro">deepseek-v4-pro</div>
+                    <div class="toolbar-popup-item" data-val="deepseek-v4-flash">deepseek-v4-flash</div>
+                  </div>
+                </div>
+                <div class="toolbar-dropdown" id="thinkingDropdownWrap">
+                  <button class="toolbar-btn" id="thinkingToggleBtn" title="Switch reasoning effort">Reasoning: max</button>
+                  <div class="toolbar-popup" id="thinkingPopup">
+                    <div class="toolbar-popup-item" data-val="max">max</div>
+                    <div class="toolbar-popup-item" data-val="high">high</div>
+                  </div>
+                </div>
                 <div class="skills-tags" id="skillsTags"></div>
               </div>
+              <button class="balance-btn" id="balanceBtn" title="DeepSeek Balance">
+                <span class="balance-display">
+                  <span class="balance-icon">⛁</span>
+                  <span class="balance-amount" id="balanceAmount">--</span>
+                </span>
+              </button>
               <button class="send-button" id="send" title="Send">
                 <svg class="send-icon" id="sendIcon" viewBox="0 0 32 32" aria-hidden="true">
                   <path
@@ -80,6 +125,88 @@
           </div>
         </div>
       </div>
+
+      <!-- 设置页面 -->
+      <div class="settings-page" id="settingsPage" style="display: none;">
+        <div class="settings-page-header">
+          <button class="settings-close-btn" id="settingsCloseBtn" title="Close">✕</button>
+          <span class="settings-page-title">Settings</span>
+        </div>
+        <div class="settings-page-content">
+          <!-- 全局设置 -->
+          <details class="settings-section" open>
+            <summary class="settings-section-title">Global Settings  <span class="settings-section-path">~/.deepcode/settings.json</span></summary>
+            <div class="settings-section-body">
+              <label class="settings-field">
+                <span class="settings-label">API Key</span>
+                <input type="password" class="settings-input" id="userApiKey" placeholder="sk-..." spellcheck="false" />
+              </label>
+              <label class="settings-field">
+                <span class="settings-label">Model</span>
+                <select class="settings-select" id="userModel">
+                  <option value="deepseek-v4-flash">deepseek-v4-flash</option>
+                  <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+                </select>
+              </label>
+              <label class="settings-field settings-field-checkbox">
+                <input type="checkbox" class="settings-checkbox" id="userThinkingEnabled" />
+                <span class="settings-label">Thinking Enabled</span>
+              </label>
+              <label class="settings-field" id="userReasoningField">
+                <span class="settings-label">Reasoning Effort</span>
+                <select class="settings-select" id="userReasoningEffort">
+                  <option value="max">max</option>
+                  <option value="high">high</option>
+                </select>
+              </label>
+              <button class="settings-save-btn" id="userSettingsSave">Save Global Settings</button>
+              <span class="settings-save-feedback" id="userSettingsFeedback"></span>
+            </div>
+          </details>
+          <!-- 项目设置 -->
+          <details class="settings-section" open>
+            <summary class="settings-section-title">Project Settings  <span class="settings-section-path">./.deepcode/settings.json</span></summary>
+            <div class="settings-section-body">
+              <label class="settings-field">
+                <span class="settings-label">API Key</span>
+                <input type="password" class="settings-input" id="projectApiKey" placeholder="sk-..." spellcheck="false" />
+              </label>
+              <label class="settings-field">
+                <span class="settings-label">Model</span>
+                <select class="settings-select" id="projectModel">
+                  <option value="deepseek-v4-flash">deepseek-v4-flash</option>
+                  <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+                </select>
+              </label>
+              <label class="settings-field settings-field-checkbox">
+                <input type="checkbox" class="settings-checkbox" id="projectThinkingEnabled" />
+                <span class="settings-label">Thinking Enabled</span>
+              </label>
+              <label class="settings-field" id="projectReasoningField">
+                <span class="settings-label">Reasoning Effort</span>
+                <select class="settings-select" id="projectReasoningEffort">
+                  <option value="max">max</option>
+                  <option value="high">high</option>
+                </select>
+              </label>
+              <button class="settings-save-btn" id="projectSettingsSave">Save Project Settings</button>
+              <span class="settings-save-feedback" id="projectSettingsFeedback"></span>
+            </div>
+          </details>
+          <!-- 工作区 -->
+          <details class="settings-section" open>
+            <summary class="settings-section-title">Workspace</summary>
+            <div class="settings-section-body">
+              <span class="settings-label">Current workspace:</span>
+              <div class="settings-workspace-row">
+                <span class="settings-workspace-path" id="workspaceDisplay"></span>
+                <input type="text" class="settings-input settings-workspace-input" id="workspaceInput" placeholder="Enter path..." />
+                <button class="settings-save-btn" id="workspaceApplyBtn">Apply</button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
     </div>
 
     <script nonce="{{nonce}}" src="{{attachmentsJsUri}}"></script>
@@ -94,6 +221,7 @@
       const promptMinRows = Number(promptInput?.getAttribute("rows")) || 3;
       const promptMaxRows = 10;
       const sendButton = document.getElementById("send");
+      const loading = document.getElementById("loading");
       const sessionSelector = document.getElementById("sessionSelector");
       const sessionSelectorTitle = document.getElementById("sessionSelectorTitle");
       const sessionSelectorTitleText = document.getElementById("sessionSelectorTitleText");
@@ -105,8 +233,8 @@
       const skillsPopup = document.getElementById("skillsPopup");
       const skillsPopupList = document.getElementById("skillsPopupList");
       const skillsTags = document.getElementById("skillsTags");
-      const permissionPromptHost = document.getElementById("permissionPromptHost");
       const contextMeter = document.getElementById("contextMeter");
+      const compactBtn = document.getElementById("compactBtn");
       const contextMeterRing = document.getElementById("contextMeterRing");
       const contextMeterTooltip = document.getElementById("contextMeterTooltip");
 
@@ -148,9 +276,6 @@
       let loadingUpdateTimer = null; // 定时更新loading文本的计时器
       let currentLlmStreamProgress = null;
       let currentTokenTelemetry = null;
-      let currentAskPermissions = [];
-      let permissionPromptState = null;
-      let pendingPermissionReply = null;
 
       function isBusyStatus(status) {
         return status === "processing" || status === "pending";
@@ -633,7 +758,7 @@
         return false;
       }
 
-      function addBubble(content, role, meta, shouldConnectToPrev = false, copySource = "") {
+      function addBubble(content, role, meta, shouldConnectToPrev = false) {
 
         const bubble = document.createElement("div");
         bubble.className = "bubble " + role;
@@ -693,47 +818,8 @@
             contentDiv.className = "bubble-normal-content";
             contentDiv.innerHTML = content;
 
-            // 添加复制按钮
-            const copyBtn = document.createElement("button");
-            copyBtn.className = "bubble-copy-btn";
-            copyBtn.title = "Copy";
-            copyBtn.innerHTML = `
-              <svg viewBox="0 0 1024 1024" aria-hidden="true">
-                <path d="M832 64H296c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h496v688c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V96c0-17.7-14.3-32-32-32zM704 192H192c-17.7 0-32 14.3-32 32v530.7c0 8.5 3.4 16.6 9.4 22.6l173.3 173.3c2.2 2.2 4.7 4 7.4 5.5v1.9h4.2c3.5 1.3 7.2 2 11 2H704c17.7 0 32-14.3 32-32V224c0-17.7-14.3-32-32-32zM350 856.2L263.9 770H350v86.2zM664 888H414V746c0-22.1-17.9-40-40-40H232V264h432v624z"/>
-              </svg>
-            `;
-            copyBtn.addEventListener("click", (e) => {
-              e.stopPropagation();
-              const textContent =
-                typeof copySource === "string" && copySource.length > 0
-                  ? copySource
-                  : contentDiv.textContent || contentDiv.innerText || "";
-              vscode.postMessage({
-                type: "copyText",
-                text: textContent
-              });
-              // 显示复制成功状态
-              copyBtn.classList.add("copied");
-              copyBtn.title = "Copied!";
-              copyBtn.innerHTML = `
-                <svg viewBox="0 0 1024 1024" aria-hidden="true">
-                  <path d="M912 190h-69.9c-9.8 0-19.1 4.5-25.1 12.2L404.7 724.5 207 474c-6.1-7.7-15.3-12.2-25.1-12.2H112c-6.7 0-10.4 7.7-6.3 12.9l273.9 347c12.8 16.2 37.4 16.2 50.3 0l488.4-618.9c4.1-5.1.4-12.8-6.3-12.8z"/>
-                </svg>
-              `;
-              setTimeout(() => {
-                copyBtn.classList.remove("copied");
-                copyBtn.title = "Copy";
-                copyBtn.innerHTML = `
-                  <svg viewBox="0 0 1024 1024" aria-hidden="true">
-                    <path d="M832 64H296c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h496v688c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V96c0-17.7-14.3-32-32-32zM704 192H192c-17.7 0-32 14.3-32 32v530.7c0 8.5 3.4 16.6 9.4 22.6l173.3 173.3c2.2 2.2 4.7 4 7.4 5.5v1.9h4.2c3.5 1.3 7.2 2 11 2H704c17.7 0 32-14.3 32-32V224c0-17.7-14.3-32-32-32zM350 856.2L263.9 770H350v86.2zM664 888H414V746c0-22.1-17.9-40-40-40H232V264h432v624z"/>
-                  </svg>
-                `;
-              }, 2000);
-            });
-
             bubble.appendChild(dot);
             bubble.appendChild(contentDiv);
-            bubble.appendChild(copyBtn);
           }
         } else if (role === "system") {
           // system 类型气泡（可折叠，显示 Skills）
@@ -869,7 +955,12 @@
         }
 
         messages.appendChild(bubble);
-        messages.scrollTop = messages.scrollHeight;
+        // 用户发消息时强制滚到底部；其他消息智能判断
+        if (role === "user") {
+          messages.scrollTop = messages.scrollHeight;
+        } else if (messages.scrollTop + messages.clientHeight >= messages.scrollHeight - 60) {
+          messages.scrollTop = messages.scrollHeight;
+        }
         lastMessageRole = role;
 
         // 如果需要连接线，动态计算并设置连接线高度
@@ -921,294 +1012,6 @@
         return div.innerHTML;
       }
 
-      function normalizeAskPermissions(value) {
-        if (!Array.isArray(value)) {
-          return [];
-        }
-        return value
-          .map((item) => {
-            if (!item || typeof item !== "object") {
-              return null;
-            }
-            const toolCallId = typeof item.toolCallId === "string" ? item.toolCallId : "";
-            const name = typeof item.name === "string" ? item.name : "Tool";
-            const command = typeof item.command === "string" ? item.command : "";
-            const description = typeof item.description === "string" ? item.description : "";
-            const scopes = Array.isArray(item.scopes)
-              ? item.scopes.filter((scope) => typeof scope === "string" && scope.length > 0)
-              : [];
-            if (!toolCallId) {
-              return null;
-            }
-            return {
-              toolCallId,
-              name,
-              command,
-              description,
-              scopes: scopes.length > 0 ? scopes : ["unknown"]
-            };
-          })
-          .filter(Boolean);
-      }
-
-      function buildPermissionScopePrompts(requests) {
-        const prompts = [];
-        requests.forEach((request) => {
-          const scopes = request.scopes && request.scopes.length > 0 ? request.scopes : ["unknown"];
-          scopes.forEach((scope) => {
-            prompts.push({ request, scope });
-          });
-        });
-        return prompts;
-      }
-
-      function isAlwaysAllowedScope(scope) {
-        return [
-          "read-in-cwd",
-          "read-out-cwd",
-          "write-in-cwd",
-          "write-out-cwd",
-          "delete-in-cwd",
-          "delete-out-cwd",
-          "query-git-log",
-          "mutate-git-log",
-          "network",
-          "mcp"
-        ].includes(scope);
-      }
-
-      function describePermissionScope(scope) {
-        switch (scope) {
-          case "read-in-cwd":
-            return "reads inside this workspace";
-          case "read-out-cwd":
-            return "reads outside this workspace";
-          case "write-in-cwd":
-            return "writes inside this workspace";
-          case "write-out-cwd":
-            return "writes outside this workspace";
-          case "delete-in-cwd":
-            return "deletes inside this workspace";
-          case "delete-out-cwd":
-            return "deletes outside this workspace";
-          case "query-git-log":
-            return "Git history queries";
-          case "mutate-git-log":
-            return "Git history changes";
-          case "network":
-            return "network access";
-          case "mcp":
-            return "MCP tool access";
-          default:
-            return "unknown access";
-        }
-      }
-
-      function getPermissionRiskClass(scope) {
-        switch (scope) {
-          case "read-in-cwd":
-          case "query-git-log":
-            return "risk-low";
-          case "read-out-cwd":
-          case "write-in-cwd":
-          case "network":
-          case "mcp":
-            return "risk-medium";
-          default:
-            return "risk-high";
-        }
-      }
-
-      function samePermissionRequests(left, right) {
-        return JSON.stringify(left || []) === JSON.stringify(right || []);
-      }
-
-      function ensurePermissionPromptState(requests) {
-        const normalizedRequests = normalizeAskPermissions(requests);
-        if (
-          permissionPromptState &&
-          samePermissionRequests(permissionPromptState.requests, normalizedRequests)
-        ) {
-          return permissionPromptState;
-        }
-        permissionPromptState = {
-          requests: normalizedRequests,
-          prompts: buildPermissionScopePrompts(normalizedRequests),
-          index: 0,
-          decisions: {},
-          alwaysAllows: [],
-          submitting: false
-        };
-        return permissionPromptState;
-      }
-
-      function findNextPermissionPromptIndex(state) {
-        let index = state.index;
-        while (index < state.prompts.length) {
-          const scope = state.prompts[index].scope;
-          if (isAlwaysAllowedScope(scope) && state.alwaysAllows.includes(scope)) {
-            index += 1;
-            continue;
-          }
-          return index;
-        }
-        return state.prompts.length;
-      }
-
-      function buildPermissionResult(state) {
-        const permissions = state.requests.map((request) => ({
-          toolCallId: request.toolCallId,
-          permission: state.decisions[request.toolCallId] === "deny" ? "deny" : "allow"
-        }));
-        return {
-          permissions,
-          alwaysAllows: state.alwaysAllows.slice(),
-          hasDeny: permissions.some((permission) => permission.permission === "deny")
-        };
-      }
-
-      function submitPermissionResult(result) {
-        permissionPromptState = null;
-        currentAskPermissions = [];
-        if (result.hasDeny) {
-          pendingPermissionReply = {
-            permissions: result.permissions,
-            alwaysAllows: result.alwaysAllows
-          };
-          currentSessionStatus = "permission_denied";
-          vscode.postMessage({
-            type: "denyPermission",
-            sessionId: currentSessionId
-          });
-          renderPermissionPrompt();
-          updateSendIconState();
-          return;
-        }
-
-        pendingPermissionReply = null;
-        renderPermissionPrompt();
-        sendUserPromptText("/continue", undefined, [], {
-          permissions: result.permissions,
-          alwaysAllows: result.alwaysAllows,
-          skipHistory: true
-        });
-      }
-
-      function commitPermissionDecision(kind) {
-        if (!permissionPromptState || permissionPromptState.submitting) {
-          return;
-        }
-        const state = permissionPromptState;
-        const promptIndex = findNextPermissionPromptIndex(state);
-        const prompt = state.prompts[promptIndex];
-        if (!prompt) {
-          state.submitting = true;
-          submitPermissionResult(buildPermissionResult(state));
-          return;
-        }
-
-        if (kind === "always" && isAlwaysAllowedScope(prompt.scope)) {
-          if (!state.alwaysAllows.includes(prompt.scope)) {
-            state.alwaysAllows.push(prompt.scope);
-          }
-          if (state.decisions[prompt.request.toolCallId] !== "deny") {
-            state.decisions[prompt.request.toolCallId] = "allow";
-          }
-        } else {
-          state.decisions[prompt.request.toolCallId] =
-            kind === "deny" ? "deny" : state.decisions[prompt.request.toolCallId] === "deny" ? "deny" : "allow";
-        }
-
-        state.index = promptIndex + 1;
-        renderPermissionPrompt();
-      }
-
-      function cancelPermissionPrompt() {
-        permissionPromptState = null;
-        currentAskPermissions = [];
-        currentSessionStatus = "interrupted";
-        pendingPermissionReply = null;
-        vscode.postMessage({ type: "interrupt" });
-        renderPermissionPrompt();
-        setLoading(false, currentSessionStatus);
-      }
-
-      function renderPermissionDeniedNotice() {
-        permissionPromptHost.innerHTML = `
-          <div class="permission-card permission-denied-card">
-            <div class="permission-title">Permission denied</div>
-            <div class="permission-description">Add a reply, then press Enter to continue with the denial.</div>
-          </div>
-        `;
-        permissionPromptHost.hidden = false;
-      }
-
-      function renderPermissionPrompt() {
-        if (!permissionPromptHost) {
-          return;
-        }
-        if (pendingPermissionReply && currentSessionStatus === "permission_denied") {
-          renderPermissionDeniedNotice();
-          return;
-        }
-        if (currentSessionStatus !== "ask_permission" || currentAskPermissions.length === 0) {
-          permissionPromptHost.innerHTML = "";
-          permissionPromptHost.hidden = true;
-          permissionPromptState = null;
-          return;
-        }
-
-        const state = ensurePermissionPromptState(currentAskPermissions);
-        const promptIndex = findNextPermissionPromptIndex(state);
-        const prompt = state.prompts[promptIndex];
-        if (!prompt) {
-          state.submitting = true;
-          submitPermissionResult(buildPermissionResult(state));
-          return;
-        }
-
-        const request = prompt.request;
-        const scopeDescription = describePermissionScope(prompt.scope);
-        const riskClass = getPermissionRiskClass(prompt.scope);
-        const canAlwaysAllow = isAlwaysAllowedScope(prompt.scope);
-
-        permissionPromptHost.innerHTML = "";
-        permissionPromptHost.hidden = false;
-
-        const card = document.createElement("div");
-        card.className = "permission-card";
-        card.innerHTML = `
-          <div class="permission-header">
-            <div>
-              <div class="permission-title">Permission required</div>
-              <div class="permission-progress">${promptIndex + 1}/${state.prompts.length}</div>
-            </div>
-            <button type="button" class="permission-close" title="Interrupt">×</button>
-          </div>
-          <div class="permission-tool">${escapeHtml(request.name)}</div>
-          <div class="permission-command">${escapeHtml(request.command || "(no command)")}</div>
-          ${request.description ? `<div class="permission-description">${escapeHtml(request.description)}</div>` : ""}
-          <div class="permission-scope ${riskClass}">${escapeHtml(scopeDescription)}</div>
-          <div class="permission-question">Do you want to proceed?</div>
-          <div class="permission-actions">
-            <button type="button" class="permission-action permission-allow">Yes</button>
-            ${
-              canAlwaysAllow
-                ? `<button type="button" class="permission-action permission-always">Yes, and always allow this scope</button>`
-                : ""
-            }
-            <button type="button" class="permission-action permission-deny">No</button>
-          </div>
-        `;
-
-        card.querySelector(".permission-close")?.addEventListener("click", cancelPermissionPrompt);
-        card.querySelector(".permission-allow")?.addEventListener("click", () => commitPermissionDecision("allow"));
-        card.querySelector(".permission-always")?.addEventListener("click", () => commitPermissionDecision("always"));
-        card.querySelector(".permission-deny")?.addEventListener("click", () => commitPermissionDecision("deny"));
-
-        permissionPromptHost.appendChild(card);
-      }
-
       function renderStructuredToolResult(toolData, container) {
         if (!toolData || toolData.ok !== true) {
           return false;
@@ -1230,45 +1033,30 @@
           return false;
         }
 
-        const details = document.createElement("div");
+        const details = document.createElement("details");
         details.className = "tool-result-details";
 
-        if (typeof toolData.output === "string" && toolData.output.trim()) {
-          const summary = document.createElement("div");
-          summary.className = "tool-result-summary";
-          summary.textContent = toolData.output.trim();
-          details.appendChild(summary);
+        // summary 显示文件名 + 代码增删统计
+        const summary = document.createElement("summary");
+        summary.className = "tool-result-summary";
+        var fpath = metadata.file_path ? getBasename(metadata.file_path) : (toolData.output || "Modified file");
+        var dPreview = metadata.diff_preview;
+        if (typeof dPreview === "string" && dPreview.trim()) {
+          var dl = dPreview.split("\n");
+          var da = 0, dr = 0;
+          for (var di = 0; di < dl.length; di++) {
+            var dli = dl[di];
+            if (dli.charAt(0) === "+" && dli.slice(0, 4) !== "+++ ") da++;
+            if (dli.charAt(0) === "-" && dli.slice(0, 4) !== "--- ") dr++;
+          }
+          summary.innerHTML = fpath + " <span style=\"color:#4caf50;font-weight:600\">+" + da + "</span> <span style=\"color:#f44336;font-weight:600\">-" + dr + "</span>";
+        } else {
+          summary.textContent = fpath;
         }
-
-        const fileRow = document.createElement("div");
-        fileRow.className = "tool-result-file-row";
-
-        const fileLabel = document.createElement("span");
-        fileLabel.className = "tool-result-label";
-        fileLabel.textContent = "File";
-        fileRow.appendChild(fileLabel);
-
-        const fileButton = document.createElement("button");
-        fileButton.type = "button";
-        fileButton.className = "tool-result-filepath";
-        fileButton.textContent = formatDisplayPath(metadata.file_path);
-        fileButton.title = metadata.file_path;
-        fileButton.addEventListener("click", (event) => {
-          event.stopPropagation();
-          const targetLine = metadata.scope && typeof metadata.scope.start_line === "number"
-            ? metadata.scope.start_line
-            : 1;
-          vscode.postMessage({
-            type: "openFile",
-            filePath: metadata.file_path,
-            line: targetLine
-          });
-        });
-        fileRow.appendChild(fileButton);
-        details.appendChild(fileRow);
+        details.appendChild(summary);
 
         if (typeof metadata.diff_preview === "string" && metadata.diff_preview.trim()) {
-          const diffBlock = renderDiffPreview(metadata.diff_preview);
+          const diffBlock = renderDiffPreview(metadata.diff_preview, metadata.file_path);
           if (diffBlock) {
             details.appendChild(diffBlock);
           }
@@ -1405,6 +1193,14 @@
         return filePath;
       }
 
+      function getBasename(filePath) {
+        if (!filePath) return "";
+        // Handle both / and \ path separators
+        const normalized = String(filePath).replace(/\\/g, "/");
+        const parts = normalized.split("/");
+        return parts[parts.length - 1] || filePath;
+      }
+
       function isPathInsideWorkspace(filePath, rootPath) {
         const normalizedFile = normalizePath(filePath);
         const normalizedRoot = normalizePath(rootPath);
@@ -1424,60 +1220,166 @@
         return String(value || "").replace(/\\/g, "/").replace(/\/+$/, "");
       }
 
-      function renderDiffPreview(diffPreview) {
-        const lines = String(diffPreview || "").split("\n");
-        const meaningfulLines = lines.filter((line) => {
-          return !line.startsWith("--- ") &&
-            !line.startsWith("+++ ") &&
-            !line.startsWith("@@ ");
-        });
+      /**
+       * Renders a diff preview with clickable line numbers.
+       * @param {string} diffPreview - unified diff text
+       * @param {string} [filePath] - file path for line-number click navigation
+       */
+      function renderDiffPreview(diffPreview, filePath) {
+        var lines = String(diffPreview || "").split("\n");
 
-        if (meaningfulLines.length === 0) {
-          return null;
-        }
-
-        const section = document.createElement("div");
+        var section = document.createElement("div");
         section.className = "tool-result-diff";
 
-        const label = document.createElement("div");
-        label.className = "tool-result-label";
-        label.textContent = "Changes";
-        section.appendChild(label);
-
-        const list = document.createElement("div");
+        var list = document.createElement("div");
         list.className = "diff-preview";
 
-        meaningfulLines.forEach((line) => {
-          if (!line) {
-            return;
+        // Track line numbers across hunks
+        var newLine = 0;
+
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          if (!line) continue;
+
+          // Skip ---/+++ headers
+          if (line.startsWith("--- ") || line.startsWith("+++ ")) continue;
+
+          // Parse @@ hunk header to set current line number
+          var hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+          if (hunkMatch) {
+            newLine = parseInt(hunkMatch[1], 10);
+            continue;
           }
 
-          const row = document.createElement("div");
+          var marker = line.charAt(0);
+          var isAdd = marker === "+";
+          var isDel = marker === "-";
+          var isCtx = !isAdd && !isDel;
+
+          var row = document.createElement("div");
           row.className = "diff-line";
+          if (isAdd) row.classList.add("added");
+          else if (isDel) row.classList.add("removed");
+          else row.classList.add("context");
 
-          const marker = document.createElement("span");
-          marker.className = "diff-line-marker";
-          marker.textContent = line[0] === "+" || line[0] === "-" ? line[0] : " ";
+          // 行号（可点击跳转）
+          var lineNum = document.createElement("span");
+          lineNum.className = "diff-line-number";
+          if (isAdd || isCtx) {
+            lineNum.textContent = String(newLine);
+            if (filePath) {
+              lineNum.style.cursor = "pointer";
+              lineNum.title = "Open at line " + newLine;
+              (function (fp, ln) {
+                lineNum.addEventListener("click", function (e) {
+                  e.stopPropagation();
+                  vscode.postMessage({ type: "openFile", filePath: fp, line: ln });
+                });
+              })(filePath, newLine);
+            }
+          }
+          if (isAdd || isCtx) newLine++;
 
-          const content = document.createElement("span");
+          // 标记 (+ / - / 空格)
+          var markerSpan = document.createElement("span");
+          markerSpan.className = "diff-line-marker";
+          markerSpan.textContent = isAdd ? "+" : isDel ? "-" : " ";
+
+          // 内容
+          var content = document.createElement("span");
           content.className = "diff-line-content";
           content.textContent = line.slice(1);
 
-          if (line.startsWith("+")) {
-            row.classList.add("added");
-          } else if (line.startsWith("-")) {
-            row.classList.add("removed");
-          } else {
-            row.classList.add("context");
-          }
-
-          row.appendChild(marker);
+          row.appendChild(lineNum);
+          row.appendChild(markerSpan);
           row.appendChild(content);
           list.appendChild(row);
-        });
+        }
 
         section.appendChild(list);
         return section;
+      }
+
+      /**
+       * 渲染单条文件修改记录，样式与编辑工具结果一致（摘要 + FILE[路径] + CHANGES）。
+       * 每条记录作为独立的气泡显示在聊天记录中，支持持久化。
+       */
+      function renderDiffSummaryMessage(msg) {
+        var data = { files: [] };
+        try { data = JSON.parse(msg.content || "{}"); } catch (e) {}
+        var files = data.files || [];
+        if (files.length === 0) return;
+
+        // 统计所有 diff 中的 +/- 行数
+        var totalAdded = 0, totalRemoved = 0;
+        files.forEach(function (f) {
+          if (!f.diffPreview) return;
+          var lines = f.diffPreview.split("\n");
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            if (line.charAt(0) === "+" && line.slice(0, 4) !== "+++ ") totalAdded++;
+            if (line.charAt(0) === "-" && line.slice(0, 4) !== "--- ") totalRemoved++;
+          }
+        });
+
+        // 父级气泡
+        var bubble = document.createElement("div");
+        bubble.className = "bubble assistant";
+
+        var parentDetails = document.createElement("details");
+        parentDetails.className = "tool-result-details";
+        parentDetails.open = false; // 默认折叠
+
+        // 标题：+N  -M（增加绿色，减少红色）
+        var parentSummary = document.createElement("summary");
+        parentSummary.className = "tool-result-summary changes-summary";
+        parentSummary.innerHTML =
+          "<span class=\"changes-summary-label\">Changes:</span>" +
+          "<span class=\"changes-summary-stats\">" +
+          "<span class=\"changes-added\">+" + totalAdded + "</span>" +
+          "  <span class=\"changes-removed\">-" + totalRemoved + "</span>" +
+          "  <span class=\"changes-filecount\">(" + files.length + " file" + (files.length > 1 ? "s" : "") + ")</span>" +
+          "</span>";
+        parentDetails.appendChild(parentSummary);
+
+        // 内部：每个文件独立一块
+        for (var fi = 0; fi < files.length; fi++) {
+          var entry = files[fi];
+          if (!entry || !entry.diffPreview) continue;
+
+          var fileDetails = document.createElement("details");
+          fileDetails.className = "tool-result-details";
+          fileDetails.open = false; // 默认折叠
+
+          // summary 显示文件名 + 该文件的 +/- 统计
+          var summaryEl = document.createElement("summary");
+          summaryEl.className = "tool-result-summary";
+          // 计算单个文件的行数
+          var fa = 0, fr = 0;
+          if (entry.diffPreview) {
+            var flines = entry.diffPreview.split("\n");
+            for (var fi2 = 0; fi2 < flines.length; fi2++) {
+              var fl = flines[fi2];
+              if (fl.charAt(0) === "+" && fl.slice(0, 4) !== "+++ ") fa++;
+              if (fl.charAt(0) === "-" && fl.slice(0, 4) !== "--- ") fr++;
+            }
+          }
+          var fname = entry.filePath ? getBasename(entry.filePath) : (entry.output || "Modified file");
+          summaryEl.innerHTML = fname + " <span style=\"color:#4caf50;font-weight:600\">+" + fa + "</span> <span style=\"color:#f44336;font-weight:600\">-" + fr + "</span>";
+          fileDetails.appendChild(summaryEl);
+
+          // diff 内容
+          var diffBlock = renderDiffPreview(entry.diffPreview, entry.filePath);
+          if (diffBlock) fileDetails.appendChild(diffBlock);
+
+          parentDetails.appendChild(fileDetails);
+        }
+
+        bubble.appendChild(parentDetails);
+        messages.appendChild(bubble);
+        if (messages.scrollTop + messages.clientHeight >= messages.scrollHeight - 60) {
+          messages.scrollTop = messages.scrollHeight;
+        }
       }
 
       function addToolParamsTooltip(element) {
@@ -1559,80 +1461,35 @@
         return `${seconds}s`;
       }
 
-      let currentThinkingBubbleElement = null; // 当前 thinking 气泡 DOM 元素
-
-      function getThinkingContentText() {
+      function updateLoadingText() {
+        const loadingSpan = loading.querySelector('span');
+        if (!loadingSpan) {
+          return;
+        }
         if (currentRunningProcesses && Object.keys(currentRunningProcesses).length > 0) {
+          // 显示第一个运行中的进程（通常只有一个进程在运行）
           const firstPid = Object.keys(currentRunningProcesses)[0];
           const process = currentRunningProcesses[firstPid];
           const elapsed = formatElapsedTime(process.startTime);
-          return `(${elapsed}) ${process.command}`;
+          loadingSpan.textContent = `(${elapsed}) ${process.command}`;
+          return;
         }
 
         if (currentLlmStreamProgress && currentLlmStreamProgress.startedAt) {
           const startedAt = new Date(currentLlmStreamProgress.startedAt).getTime();
           const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-          const formattedTokens = currentLlmStreamProgress.formattedTokens || "0";
           if (elapsedSeconds >= 3) {
-            return `(${elapsedSeconds}s) · ↓ ${formattedTokens} tokens`;
+            const formattedTokens = currentLlmStreamProgress.formattedTokens || "0";
+            loadingSpan.textContent = `Thinking... (${elapsedSeconds}s) · ↓ ${formattedTokens} tokens`;
+            return;
           }
         }
 
-        return "Processing...";
-      }
-
-      function updateThinkingBubbleContent() {
-        if (!currentThinkingBubbleElement) return;
-        const statusEl = currentThinkingBubbleElement.querySelector(".thinking-status");
-        if (statusEl) {
-          statusEl.textContent = getThinkingContentText();
-        }
-      }
-
-      function removeThinkingBubble() {
-        if (currentThinkingBubbleElement) {
-          currentThinkingBubbleElement.remove();
-          currentThinkingBubbleElement = null;
-        }
-      }
-
-      function createThinkingBubble(shouldConnectToPrev) {
-        removeThinkingBubble();
-
-        const bubble = document.createElement("div");
-        bubble.className = "bubble assistant";
-        bubble.dataset.thinkingLive = "true";
-
-        const header = document.createElement("div");
-        header.className = "bubble-collapsible-header";
-
-        const dotClass = shouldConnectToPrev ? "bubble-dot spinner-dot connect-to-prev" : "bubble-dot spinner-dot";
-        const statusText = getThinkingContentText();
-        header.innerHTML = `
-          <span class="${dotClass}"></span>
-          <span class="bubble-title">
-            <span class="bubble-title-text"><b>Thinking</b> <span class="thinking-status">${escapeHtml(statusText)}</span></span>
-          </span>
-        `;
-
-        bubble.appendChild(header);
-        messages.appendChild(bubble);
-        messages.scrollTop = messages.scrollHeight;
-
-        currentThinkingBubbleElement = bubble;
-
-        // 连接线
-        if (shouldConnectToPrev) {
-          requestAnimationFrame(() => {
-            updateConnectionLine(bubble);
-          });
-        }
-        requestAnimationFrame(() => {
-          updateAllConnectionLines();
-        });
+        loadingSpan.textContent = 'Thinking...';
       }
 
       function setLoading(isLoading, status) {
+        loading.classList.toggle("active", isLoading);
         if (status !== undefined) {
           currentSessionStatus = status;
         }
@@ -1647,13 +1504,11 @@
         }
 
         if (isLoading) {
-          // 创建 thinking bubble，连到上一条非 user 消息
-          const shouldConnect = lastMessageRole !== null && lastMessageRole !== "user";
-          createThinkingBubble(shouldConnect);
-          loadingUpdateTimer = setInterval(updateThinkingBubbleContent, 1000);
-        } else {
-          removeThinkingBubble();
+          loadingUpdateTimer = setInterval(updateLoadingText, 1000);
         }
+
+        // 更新初始文本
+        updateLoadingText();
 
         // 切换图标
         if (isLoading) {
@@ -1668,7 +1523,6 @@
 
         updateSendIconState();
         updateAskUserQuestionInteractivity();
-        renderPermissionPrompt();
       }
 
       function updateSendIconState() {
@@ -1936,31 +1790,23 @@
       updateSendIconState();
       autoResizePrompt();
 
-      function sendUserPromptText(text, skills, imageUrls, options = {}) {
+      function sendUserPromptText(text, skills, imageUrls) {
         const trimmed = (text || "").trim();
         const normalizedImages = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
-        const permissions = Array.isArray(options.permissions) ? options.permissions : undefined;
-        const alwaysAllows = Array.isArray(options.alwaysAllows) ? options.alwaysAllows : undefined;
-        const hasPermissionPayload = Boolean(
-          (permissions && permissions.length > 0) || (alwaysAllows && alwaysAllows.length > 0)
-        );
-        if ((!trimmed && normalizedImages.length === 0 && !hasPermissionPayload) || sendButton.disabled) {
-          return false;
+        if ((!trimmed && normalizedImages.length === 0) || sendButton.disabled) {
+          return;
         }
 
         historyCursor = -1;
         draftBeforeHistory = null;
-        pendingUserPrompt = options.skipHistory ? null : trimmed || (normalizedImages.length > 0 ? "粘贴的图像" : "");
+        pendingUserPrompt = trimmed || (normalizedImages.length > 0 ? "粘贴的图像" : "");
 
         vscode.postMessage({
           type: "userPrompt",
           prompt: trimmed,
           skills: skills && skills.length > 0 ? skills : undefined,
-          images: normalizedImages.length > 0 ? normalizedImages : undefined,
-          permissions,
-          alwaysAllows
+          images: normalizedImages.length > 0 ? normalizedImages : undefined
         });
-        return true;
       }
 
       function sendPrompt() {
@@ -1984,13 +1830,7 @@
         promptInput.value = "";
         vscode.setState({ promptText: "" });
         autoResizePrompt();
-        const permissionReply = pendingPermissionReply;
-        const sent = sendUserPromptText(text, selectedSkills, imageUrls, permissionReply || {});
-        if (!sent) {
-          return;
-        }
-        pendingPermissionReply = null;
-        renderPermissionPrompt();
+        sendUserPromptText(text, selectedSkills, imageUrls);
         // 清空已选择的技能
         selectedSkills = [];
         attachmentManager?.clear();
@@ -2017,7 +1857,197 @@
         updateSendIconState();
       });
 
+      // ── 设置页面 ──
+      function loadSettings() {
+        vscode.postMessage({ type: "loadSettings" });
+      }
+
+      function applySettingsToUI(data) {
+        function fill(prefix, s) {
+          document.getElementById(prefix + "ApiKey").value = (s && s.env && s.env.API_KEY) || "";
+          document.getElementById(prefix + "Model").value = (s && s.model) || "deepseek-v4-pro";
+          var thinking = s ? (s.thinkingEnabled !== false) : true;
+          document.getElementById(prefix + "ThinkingEnabled").checked = thinking;
+          document.getElementById(prefix + "ReasoningEffort").value = (s && s.reasoningEffort) || "max";
+          document.getElementById(prefix + "ReasoningField").style.display = thinking ? "" : "none";
+        }
+        fill("user", data.userSettings);
+        fill("project", data.projectSettings);
+        // 同步快捷切换按钮
+        var model = (data.projectSettings && data.projectSettings.model) || (data.userSettings && data.userSettings.model) || "deepseek-v4-pro";
+        var effort = (data.projectSettings && data.projectSettings.reasoningEffort) || (data.userSettings && data.userSettings.reasoningEffort) || "max";
+        document.getElementById("modelToggleBtn").textContent = L.model + ": " + (model === "deepseek-v4-pro" ? "pro" : "flash");
+        document.getElementById("thinkingToggleBtn").textContent = L.reasoning + ": " + effort;
+      }
+
+      document.getElementById("settingsBtn").addEventListener("click", function () {
+        document.getElementById("settingsPage").style.display = "flex";
+        loadSettings();
+      });
+      compactBtn?.addEventListener("click", function () {
+        vscode.postMessage({ type: "compactSession" });
+      });
+      document.getElementById("settingsCloseBtn").addEventListener("click", function () {
+        document.getElementById("settingsPage").style.display = "none";
+      });
+
+      // Thinking checkbox → 显示/隐藏 Reasoning Effort
+      ["user", "project"].forEach(function (p) {
+        document.getElementById(p + "ThinkingEnabled").addEventListener("change", function () {
+          document.getElementById(p + "ReasoningField").style.display = this.checked ? "" : "none";
+        });
+      });
+
+      // ── 本地化 ──
+      var isZh = (navigator.language || "").startsWith("zh");
+      var L = { model: isZh ? "模型" : "Model", reasoning: isZh ? "思考强度" : "Reasoning" };
+
+      function updateDropdownLabels() {
+        var btn = document.getElementById("modelToggleBtn");
+        var label = (btn.textContent || "").replace(/^[^:]+: /, "");
+        btn.textContent = L.model + ": " + label;
+        var btn2 = document.getElementById("thinkingToggleBtn");
+        label = (btn2.textContent || "").replace(/^[^:]+: /, "");
+        btn2.textContent = L.reasoning + ": " + label;
+      }
+
+      // ── 下拉菜单 ──
+      function setupDropdown(wrapId, btnId, popupId, saveFn) {
+        var wrap = document.getElementById(wrapId);
+        var btn = document.getElementById(btnId);
+        var popup = document.getElementById(popupId);
+
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var isOpen = popup.classList.contains("show");
+          // 关闭所有下拉
+          document.querySelectorAll(".toolbar-popup.show").forEach(function (p) { p.classList.remove("show"); });
+          if (!isOpen) popup.classList.add("show");
+        });
+
+        popup.querySelectorAll(".toolbar-popup-item").forEach(function (item) {
+          item.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var val = item.getAttribute("data-val");
+            var display = item.textContent;
+            popup.classList.remove("show");
+            saveFn(val, display);
+          });
+        });
+      }
+
+      document.addEventListener("click", function () {
+        document.querySelectorAll(".toolbar-popup.show").forEach(function (p) { p.classList.remove("show"); });
+      });
+
+      setupDropdown("modelDropdownWrap", "modelToggleBtn", "modelPopup", function (val, display) {
+        var shortName = val === "deepseek-v4-pro" ? "pro" : "flash";
+        vscode.postMessage({ type: "loadSettings" });
+        var cb = function (e) {
+          if (e.data.type === "settingsData") {
+            window.removeEventListener("message", cb);
+            var userEnv = e.data.userSettings ? e.data.userSettings.env : undefined;
+            var projEnv = e.data.projectSettings ? e.data.projectSettings.env : undefined;
+            var userThinking = e.data.userSettings ? (e.data.userSettings.thinkingEnabled !== false) : true;
+            var projThinking = e.data.projectSettings ? (e.data.projectSettings.thinkingEnabled !== false) : true;
+            vscode.postMessage({ type: "saveBothSettings",
+              userSettings: { model: val, env: userEnv, thinkingEnabled: userThinking },
+              projectSettings: { model: val, env: projEnv, thinkingEnabled: projThinking }
+            });
+            document.getElementById("modelToggleBtn").textContent = L.model + ": " + shortName;
+          }
+        };
+        window.addEventListener("message", cb);
+        document.getElementById("modelToggleBtn").textContent = L.model + ": " + shortName;
+      });
+
+      setupDropdown("thinkingDropdownWrap", "thinkingToggleBtn", "thinkingPopup", function (val, display) {
+        vscode.postMessage({ type: "loadSettings" });
+        var cb = function (e) {
+          if (e.data.type === "settingsData") {
+            window.removeEventListener("message", cb);
+            var userS = e.data.userSettings || {};
+            var projS = e.data.projectSettings || {};
+            var userThinking = (userS.thinkingEnabled !== false);
+            var projThinking = (projS.thinkingEnabled !== false);
+            vscode.postMessage({ type: "saveBothSettings",
+              userSettings: { reasoningEffort: val, model: userS.model, env: userS.env, thinkingEnabled: userThinking },
+              projectSettings: { reasoningEffort: val, model: projS.model, env: projS.env, thinkingEnabled: projThinking }
+            });
+            document.getElementById("thinkingToggleBtn").textContent = L.reasoning + ": " + display;
+          }
+        };
+        window.addEventListener("message", cb);
+        document.getElementById("thinkingToggleBtn").textContent = L.reasoning + ": " + display;
+      });
+
+      // 保存全局设置
+      document.getElementById("userSettingsSave").addEventListener("click", function () {
+        var s = {
+          env: { API_KEY: document.getElementById("userApiKey").value || undefined },
+          model: document.getElementById("userModel").value,
+          thinkingEnabled: document.getElementById("userThinkingEnabled").checked,
+          reasoningEffort: document.getElementById("userReasoningEffort").value,
+        };
+        // 清理空值
+        if (!s.env.API_KEY) delete s.env;
+        vscode.postMessage({ type: "saveUserSettings", settings: s });
+        document.getElementById("userSettingsFeedback").textContent = "Saving...";
+      });
+
+      // 保存项目设置
+      document.getElementById("projectSettingsSave").addEventListener("click", function () {
+        var s = {
+          env: { API_KEY: document.getElementById("projectApiKey").value || undefined },
+          model: document.getElementById("projectModel").value,
+          thinkingEnabled: document.getElementById("projectThinkingEnabled").checked,
+          reasoningEffort: document.getElementById("projectReasoningEffort").value,
+        };
+        if (!s.env.API_KEY) delete s.env;
+        vscode.postMessage({ type: "saveProjectSettings", settings: s });
+        document.getElementById("projectSettingsFeedback").textContent = "Saving...";
+      });
+
+      // 工作区切换 banner 按钮
+      document.getElementById("workspaceSwitchBtn").addEventListener("click", function () {
+        var target = document.getElementById("workspaceBanner").dataset.targetPath;
+        if (target) vscode.postMessage({ type: "switchWorkspace", path: target });
+      });
+      document.getElementById("workspaceBannerClose").addEventListener("click", function () {
+        document.getElementById("workspaceBanner").style.display = "none";
+      });
+      // 设置页工作区 Apply
+      document.getElementById("workspaceApplyBtn").addEventListener("click", function () {
+        var p = document.getElementById("workspaceInput").value.trim();
+        if (p) vscode.postMessage({ type: "switchWorkspace", path: p });
+      });
+
       sendButton.addEventListener("click", sendPrompt);
+
+      // ── Balance display ──
+      const balanceBtn = document.getElementById("balanceBtn");
+      const balanceAmount = document.getElementById("balanceAmount");
+
+      function updateBalanceDisplay(balance) {
+        if (!balanceAmount || !balanceBtn) return;
+        // null 表示刷新失败，静默保留旧值
+        if (!balance || typeof balance.total !== "number") return;
+        const sym = balance.currency === "CNY" ? "¥" : "$";
+        balanceAmount.textContent = sym + balance.total.toFixed(2);
+        balanceBtn.classList.add("has-balance");
+        balanceBtn.classList.toggle("balance-low", balance.total < 10);
+        balanceBtn.title = sym + balance.total.toFixed(2) + " · Click to view usage";
+      }
+
+      if (balanceBtn) {
+        balanceBtn.addEventListener("click", () => {
+          vscode.postMessage({ type: "openUrl", url: "https://platform.deepseek.com/usage" });
+        });
+      }
+
+      // Request balance on load
+      vscode.postMessage({ type: "requestBalance" });
+
       promptInput.addEventListener("keydown", (event) => {
         // History navigation: only intercept ArrowUp/Down at the very start/end of the textarea.
         // Otherwise keep native cursor movement (line up/down).
@@ -2082,10 +2112,6 @@
         }
 
         if (event.key === "Enter") {
-          if (event.isComposing) {
-            // 输入法组合中（如中文输入法选字），不处理回车
-            return;
-          }
           if (event.shiftKey) {
             // Shift+回车：允许换行（默认行为）
             return;
@@ -2114,7 +2140,12 @@
         } else if (msg.role === "user") {
           addBubble(msg.content, "user", msg.meta, false);
         } else if (msg.role === "assistant") {
-          addBubble(msg.html || msg.content, "assistant", msg.meta, shouldConnect, msg.content || "");
+          // 文件修改汇总：渲染成可点击的编辑结果样式
+          if (msg.meta && msg.meta.isDiffSummary) {
+            renderDiffSummaryMessage(msg);
+          } else {
+            addBubble(msg.html || msg.content, "assistant", msg.meta, shouldConnect);
+          }
         } else if (msg.role === "tool") {
           addBubble(msg.content, "tool", msg.meta, shouldConnect);
         }
@@ -2130,9 +2161,6 @@
           }
           currentSessionId = null;
           currentSessionStatus = message.status || null;
-          currentAskPermissions = [];
-          permissionPromptState = null;
-          pendingPermissionReply = null;
           updateContextMeter(message.tokenTelemetry);
           attachmentManager?.clear();
           setLoading(false, currentSessionStatus);
@@ -2152,9 +2180,17 @@
           // 加载已有对话
           currentSessionId = message.sessionId;
           currentSessionStatus = message.status || null;
-          currentAskPermissions = normalizeAskPermissions(message.askPermissions);
-          permissionPromptState = null;
-          pendingPermissionReply = null;
+          // 跨项目提示 banner：用插件当前工作区判断，而非 VSCode 工作区
+          var origPath = message.originalProjectPath;
+          var curRoot = message.currentProjectRoot;
+          var banner = document.getElementById("workspaceBanner");
+          if (origPath && curRoot && origPath !== curRoot) {
+            banner.querySelector(".workspace-banner-path").textContent = origPath;
+            banner.style.display = "flex";
+            banner.dataset.targetPath = origPath;
+          } else {
+            banner.style.display = "none";
+          }
           updateContextMeter(message.tokenTelemetry);
           if ('processes' in message) {
             currentRunningProcesses = message.processes;
@@ -2196,6 +2232,8 @@
             // 批量更新所有连接线的高度
             requestAnimationFrame(() => {
               updateAllConnectionLines();
+              // 初始加载时强制滚动到底部
+              messages.scrollTop = messages.scrollHeight;
             });
 
             // 找最后一条 asThinking 为 true 的消息并展开
@@ -2213,7 +2251,6 @@
           // 设置会话状态
           const isCurrentlyProcessing = isBusyStatus(currentSessionStatus);
           setLoading(isCurrentlyProcessing, currentSessionStatus);
-          renderPermissionPrompt();
 
           // 如果消息中包含sessions，更新下拉框
           if (message.sessions && Array.isArray(message.sessions)) {
@@ -2229,12 +2266,6 @@
             return;
           }
           const nextStatus = message.status || null;
-          if ('askPermissions' in message) {
-            currentAskPermissions = normalizeAskPermissions(message.askPermissions);
-            if (nextStatus !== "ask_permission") {
-              permissionPromptState = null;
-            }
-          }
           if ('processes' in message) {
             currentRunningProcesses = message.processes;
           }
@@ -2242,7 +2273,10 @@
             updateContextMeter(message.tokenTelemetry);
           }
           setLoading(isBusyStatus(nextStatus), nextStatus);
-          renderPermissionPrompt();
+          // 回答完毕后自动刷新余额
+          if (nextStatus === "completed") {
+            vscode.postMessage({ type: "requestBalance" });
+          }
         } else if (message.type === "llmStreamProgress") {
           const progress = message.progress || null;
           if (!progress || !progress.requestId) {
@@ -2258,7 +2292,7 @@
           } else {
             currentLlmStreamProgress = progress;
           }
-          updateThinkingBubbleContent();
+          updateLoadingText();
         } else if (message.type === "userMessage") {
           // 显示用户消息（纯文本）
           addBubble(message.content || "", "user", message.meta, false);
@@ -2283,7 +2317,7 @@
         } else if (message.type === "assistant") {
           // 接收助手回复
           const shouldConnect = lastMessageRole !== null && lastMessageRole !== "user";
-          addBubble(message.html || message.content || "", "assistant", message.meta, shouldConnect, message.content || "");
+          addBubble(message.html || "", "assistant", message.meta, shouldConnect);
         } else if (message.type === "loading") {
           // 加载状态
           const newStatus = message.value ? "processing" : currentSessionStatus;
@@ -2329,9 +2363,26 @@
             }
           }
         } else if (message.type === "skillsList") {
-          // 接收可用技能列表
           availableSkills = message.skills || [];
           updateSkillsButtonTooltip();
+        } else if (message.type === "settingsData") {
+          applySettingsToUI(message);
+          var ws = message.sessionManagerRoot || message.currentWorkspace || "";
+          document.getElementById("workspaceDisplay").textContent = ws;
+        } else if (message.type === "saveResult") {
+          var feedback = document.getElementById(message.scope + "SettingsFeedback");
+          feedback.textContent = message.success ? "Saved ✓" : "Save failed ✗";
+          setTimeout(function () { feedback.textContent = ""; }, 2500);
+          if (message.success) loadSettings();
+        } else if (message.type === "balanceData") {
+          updateBalanceDisplay(message.balance);
+        } else if (message.type === "workspaceChanged") {
+          document.getElementById("workspaceBanner").style.display = "none";
+          document.getElementById("workspaceDisplay").textContent = message.path;
+          loadSettings();
+        } else if (message.type === "workspaceInfo") {
+          var wsRoot = message.sessionManagerRoot || message.workspaceRoot || "";
+          document.getElementById("workspaceDisplay").textContent = wsRoot;
         }
       });
 
@@ -2349,6 +2400,9 @@
 
       // 请求可用技能列表
       vscode.postMessage({ type: "requestSkills" });
+
+      // 初始化读取设置，使右下角按钮显示真实值
+      setTimeout(function () { loadSettings(); }, 100);
     </script>
   </body>
 </html>

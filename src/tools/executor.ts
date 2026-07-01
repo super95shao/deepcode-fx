@@ -13,11 +13,9 @@ export type CreateOpenAIClient = () => {
   client: OpenAI | null;
   model: string;
   baseURL?: string;
-  temperature?: number;
   thinkingEnabled: boolean;
   reasoningEffort?: ReasoningEffort;
   debugLogEnabled?: boolean;
-  telemetryEnabled?: boolean;
   notify?: string;
   webSearchTool?: string;
   env?: Record<string, string>;
@@ -42,7 +40,6 @@ export type ToolExecutionContext = {
   onProcessExit?: (processId: string | number) => void;
   onProcessStdout?: (processId: string | number, chunk: string) => void;
   onProcessTimeoutControl?: (processId: string | number, control: ProcessTimeoutControl | null) => void;
-  onBackgroundProcessComplete?: (completion: BackgroundProcessCompletion) => void;
   onBeforeFileMutation?: (filePath: string) => void;
   onAfterFileMutation?: (filePath: string) => void;
   bashTimeoutMs?: number;
@@ -54,25 +51,9 @@ export type ToolExecutionHooks = {
   onProcessExit?: (processId: string | number) => void;
   onProcessStdout?: (processId: string | number, chunk: string) => void;
   onProcessTimeoutControl?: (processId: string | number, control: ProcessTimeoutControl | null) => void;
-  onBackgroundProcessComplete?: (completion: BackgroundProcessCompletion) => void;
   onBeforeFileMutation?: (filePath: string) => void;
   onAfterFileMutation?: (filePath: string) => void;
   shouldStop?: () => boolean;
-};
-
-export type BackgroundProcessCompletion = {
-  taskId: string;
-  processId: number;
-  command: string;
-  outputPath: string;
-  ok: boolean;
-  exitCode: number | null;
-  signal: string | null;
-  error?: string;
-  cwd: string | null;
-  shellPath: string;
-  startedAtMs: number;
-  completedAtMs: number;
 };
 
 export type ProcessTimeoutInfo = {
@@ -122,7 +103,7 @@ export type ToolCallExecution = {
 };
 
 export class ToolExecutor {
-  private readonly projectRoot: string;
+  private projectRoot: string;
   private readonly createOpenAIClient?: CreateOpenAIClient;
   private readonly mcpManager?: McpManager;
   private readonly toolHandlers = new Map<string, ToolHandler>();
@@ -132,6 +113,16 @@ export class ToolExecutor {
     this.createOpenAIClient = createOpenAIClient;
     this.mcpManager = mcpManager;
     this.registerToolHandlers();
+  }
+
+  /** 获取当前工作区根路径 */
+  getProjectRoot(): string {
+    return this.projectRoot;
+  }
+
+  /** 切换工作区根路径 — 后续 bash/read/write/edit 将使用新路径 */
+  setProjectRoot(newRoot: string): void {
+    this.projectRoot = newRoot;
   }
 
   async executeToolCalls(
@@ -248,7 +239,6 @@ export class ToolExecutor {
         onProcessExit: hooks?.onProcessExit,
         onProcessStdout: hooks?.onProcessStdout,
         onProcessTimeoutControl: hooks?.onProcessTimeoutControl,
-        onBackgroundProcessComplete: hooks?.onBackgroundProcessComplete,
         onBeforeFileMutation: hooks?.onBeforeFileMutation,
         onAfterFileMutation: hooks?.onAfterFileMutation,
       });

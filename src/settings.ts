@@ -1,17 +1,12 @@
-import { defaultsToThinkingMode } from "./common/model-capabilities";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
+
 
 export type DeepcodingEnv = Record<string, string | undefined> & {
   MODEL?: string;
   BASE_URL?: string;
   API_KEY?: string;
-  TEMPERATURE?: string;
   THINKING_ENABLED?: string;
   REASONING_EFFORT?: string;
   DEBUG_LOG_ENABLED?: string;
-  TELEMETRY_ENABLED?: string;
 };
 
 export type ReasoningEffort = "high" | "max";
@@ -22,42 +17,15 @@ export type McpServerConfig = {
   env?: Record<string, string>;
 };
 
-export type PermissionScope =
-  | "read-in-cwd"
-  | "read-out-cwd"
-  | "write-in-cwd"
-  | "write-out-cwd"
-  | "delete-in-cwd"
-  | "delete-out-cwd"
-  | "query-git-log"
-  | "mutate-git-log"
-  | "network"
-  | "mcp";
-
-export type PermissionDefaultMode = "allowAll" | "askAll";
-
-export type PermissionSettings = {
-  allow?: PermissionScope[];
-  deny?: PermissionScope[];
-  ask?: PermissionScope[];
-  defaultMode?: PermissionDefaultMode;
-};
-
-export type EnabledSkillsSettings = Record<string, boolean>;
-
 export type DeepcodingSettings = {
   env?: DeepcodingEnv;
   model?: string;
-  temperature?: number;
   thinkingEnabled?: boolean;
   reasoningEffort?: ReasoningEffort;
   debugLogEnabled?: boolean;
-  telemetryEnabled?: boolean;
   notify?: string;
   webSearchTool?: string;
   mcpServers?: Record<string, McpServerConfig>;
-  permissions?: PermissionSettings;
-  enabledSkills?: EnabledSkillsSettings;
 };
 
 export type ResolvedDeepcodingSettings = {
@@ -65,16 +33,12 @@ export type ResolvedDeepcodingSettings = {
   apiKey?: string;
   baseURL: string;
   model: string;
-  temperature?: number;
   thinkingEnabled: boolean;
   reasoningEffort: ReasoningEffort;
   debugLogEnabled: boolean;
-  telemetryEnabled: boolean;
   notify?: string;
   webSearchTool?: string;
   mcpServers?: Record<string, McpServerConfig>;
-  permissions: Required<PermissionSettings>;
-  enabledSkills: EnabledSkillsSettings;
 };
 
 export type ModelConfigSelection = {
@@ -107,113 +71,8 @@ function parseBoolean(value: unknown): boolean | undefined {
   return undefined;
 }
 
-function parseTemperature(value: unknown): number | undefined {
-  const raw = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
-  if (!Number.isFinite(raw) || raw < 0 || raw > 2) {
-    return undefined;
-  }
-  return raw;
-}
-
 function trimString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
-}
-
-const VALID_PERMISSION_SCOPES = new Set<PermissionScope>([
-  "read-in-cwd",
-  "read-out-cwd",
-  "write-in-cwd",
-  "write-out-cwd",
-  "delete-in-cwd",
-  "delete-out-cwd",
-  "query-git-log",
-  "mutate-git-log",
-  "network",
-  "mcp",
-]);
-
-function normalizePermissionList(value: unknown): PermissionScope[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  const result: PermissionScope[] = [];
-  for (const item of value) {
-    if (typeof item !== "string" || !VALID_PERMISSION_SCOPES.has(item as PermissionScope)) {
-      continue;
-    }
-    const scope = item as PermissionScope;
-    if (!result.includes(scope)) {
-      result.push(scope);
-    }
-  }
-  return result;
-}
-
-function mergePermissionLists(...lists: Array<PermissionScope[] | undefined>): PermissionScope[] {
-  const result: PermissionScope[] = [];
-  for (const list of lists) {
-    for (const scope of list ?? []) {
-      if (!result.includes(scope)) {
-        result.push(scope);
-      }
-    }
-  }
-  return result;
-}
-
-function normalizePermissionDefaultMode(value: unknown): PermissionDefaultMode | undefined {
-  return value === "allowAll" || value === "askAll" ? value : undefined;
-}
-
-function normalizePermissions(settings: PermissionSettings | null | undefined): Required<PermissionSettings> {
-  return {
-    allow: normalizePermissionList(settings?.allow),
-    deny: normalizePermissionList(settings?.deny),
-    ask: normalizePermissionList(settings?.ask),
-    defaultMode: normalizePermissionDefaultMode(settings?.defaultMode) ?? "allowAll",
-  };
-}
-
-function mergePermissions(
-  userSettings: DeepcodingSettings | null | undefined,
-  projectSettings: DeepcodingSettings | null | undefined
-): Required<PermissionSettings> {
-  const userPermissions = normalizePermissions(userSettings?.permissions);
-  const projectPermissions = normalizePermissions(projectSettings?.permissions);
-  return {
-    allow: mergePermissionLists(userPermissions.allow, projectPermissions.allow),
-    deny: mergePermissionLists(userPermissions.deny, projectPermissions.deny),
-    ask: mergePermissionLists(userPermissions.ask, projectPermissions.ask),
-    defaultMode: projectSettings?.permissions
-      ? projectPermissions.defaultMode
-      : userSettings?.permissions
-        ? userPermissions.defaultMode
-        : "allowAll",
-  };
-}
-
-function normalizeEnabledSkills(value: unknown): EnabledSkillsSettings {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-  const result: EnabledSkillsSettings = {};
-  for (const [name, enabled] of Object.entries(value)) {
-    if (!name || typeof enabled !== "boolean") {
-      continue;
-    }
-    result[name] = enabled;
-  }
-  return result;
-}
-
-function mergeEnabledSkills(
-  userSettings: DeepcodingSettings | null | undefined,
-  projectSettings: DeepcodingSettings | null | undefined
-): EnabledSkillsSettings {
-  return {
-    ...normalizeEnabledSkills(userSettings?.enabledSkills),
-    ...normalizeEnabledSkills(projectSettings?.enabledSkills),
-  };
 }
 
 function normalizeEnv(env: DeepcodingSettings["env"]): Record<string, string> {
@@ -337,7 +196,7 @@ export function resolveSettingsSources(
     parseBoolean(projectEnv.THINKING_ENABLED) ??
     parseBoolean(userSettings?.thinkingEnabled) ??
     parseBoolean(userEnv.THINKING_ENABLED) ??
-    defaultsToThinkingMode(model);
+    true;  // DeepSeek V4 always enables thinking by default
 
   const reasoningEffort =
     resolveReasoningEffort(systemEnv.REASONING_EFFORT) ??
@@ -347,13 +206,6 @@ export function resolveSettingsSources(
     resolveReasoningEffort(userEnv.REASONING_EFFORT) ??
     "max";
 
-  const temperature =
-    parseTemperature(systemEnv.TEMPERATURE) ??
-    parseTemperature(projectSettings?.temperature) ??
-    parseTemperature(projectEnv.TEMPERATURE) ??
-    parseTemperature(userSettings?.temperature) ??
-    parseTemperature(userEnv.TEMPERATURE);
-
   const debugLogEnabled =
     parseBoolean(systemEnv.DEBUG_LOG_ENABLED) ??
     parseBoolean(projectSettings?.debugLogEnabled) ??
@@ -361,14 +213,6 @@ export function resolveSettingsSources(
     parseBoolean(userSettings?.debugLogEnabled) ??
     parseBoolean(userEnv.DEBUG_LOG_ENABLED) ??
     false;
-
-  const telemetryEnabled =
-    parseBoolean(systemEnv.TELEMETRY_ENABLED) ??
-    parseBoolean(projectSettings?.telemetryEnabled) ??
-    parseBoolean(projectEnv.TELEMETRY_ENABLED) ??
-    parseBoolean(userSettings?.telemetryEnabled) ??
-    parseBoolean(userEnv.TELEMETRY_ENABLED) ??
-    true;
 
   const notify =
     trimString(systemEnv.NOTIFY) || trimString(projectSettings?.notify) || trimString(userSettings?.notify) || "";
@@ -383,16 +227,12 @@ export function resolveSettingsSources(
     apiKey: trimString(env.API_KEY) || undefined,
     baseURL: trimString(env.BASE_URL) || defaults.baseURL,
     model,
-    temperature,
     thinkingEnabled,
     reasoningEffort,
     debugLogEnabled,
-    telemetryEnabled,
     notify: notify || undefined,
     webSearchTool: webSearchTool || undefined,
     mcpServers: mergeMcpServers(userSettings, projectSettings, userEnv, projectEnv, systemEnv),
-    permissions: mergePermissions(userSettings, projectSettings),
-    enabledSkills: mergeEnabledSkills(userSettings, projectSettings),
   };
 }
 
@@ -432,89 +272,4 @@ export function applyModelConfigSelection(
   }
 
   return { settings: next, changed: true };
-}
-
-// ---------------------------------------------------------------------------
-// Default constants
-// ---------------------------------------------------------------------------
-
-export const DEFAULT_MODEL = "deepseek-v4-pro";
-export const DEFAULT_BASE_URL = "https://api.deepseek.com";
-
-// ---------------------------------------------------------------------------
-// Settings file I/O
-// ---------------------------------------------------------------------------
-
-export function getUserSettingsPath(): string {
-  return path.join(os.homedir(), ".deepcode", "settings.json");
-}
-
-export function getProjectSettingsPath(projectRoot: string): string {
-  return path.join(projectRoot, ".deepcode", "settings.json");
-}
-
-export function readSettingsFile(settingsPath: string): DeepcodingSettings | null {
-  try {
-    if (!fs.existsSync(settingsPath)) {
-      return null;
-    }
-    const raw = fs.readFileSync(settingsPath, "utf8");
-    return JSON.parse(raw) as DeepcodingSettings;
-  } catch {
-    return null;
-  }
-}
-
-export function readSettings(): DeepcodingSettings | null {
-  return readSettingsFile(getUserSettingsPath());
-}
-
-export function readProjectSettings(projectRoot: string = process.cwd()): DeepcodingSettings | null {
-  return readSettingsFile(getProjectSettingsPath(projectRoot));
-}
-
-function writeSettingsFile(settingsPath: string, settings: DeepcodingSettings): void {
-  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
-  fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
-}
-
-export function writeSettings(settings: DeepcodingSettings): void {
-  const settingsPath = getUserSettingsPath();
-  writeSettingsFile(settingsPath, settings);
-}
-
-export function writeProjectSettings(settings: DeepcodingSettings, projectRoot: string = process.cwd()): void {
-  const settingsPath = getProjectSettingsPath(projectRoot);
-  writeSettingsFile(settingsPath, settings);
-}
-
-export function writeModelConfigSelection(
-  selection: ModelConfigSelection,
-  current: ModelConfigSelection = resolveCurrentSettings(),
-  projectRoot: string = process.cwd()
-): { changed: boolean; settings: DeepcodingSettings } {
-  const projectSettingsPath = getProjectSettingsPath(projectRoot);
-  const shouldWriteProjectSettings = fs.existsSync(projectSettingsPath);
-  const rawSettings = shouldWriteProjectSettings ? readProjectSettings(projectRoot) : readSettings();
-  const result = applyModelConfigSelection(rawSettings, current, selection);
-  if (result.changed) {
-    if (shouldWriteProjectSettings) {
-      writeProjectSettings(result.settings, projectRoot);
-    } else {
-      writeSettings(result.settings);
-    }
-  }
-  return result;
-}
-
-export function resolveCurrentSettings(projectRoot: string = process.cwd()): ResolvedDeepcodingSettings {
-  return resolveSettingsSources(
-    readSettings(),
-    readProjectSettings(projectRoot),
-    {
-      model: DEFAULT_MODEL,
-      baseURL: DEFAULT_BASE_URL,
-    },
-    process.env
-  );
 }
