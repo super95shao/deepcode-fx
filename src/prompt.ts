@@ -531,6 +531,53 @@ export function getTools(_options: PromptToolOptions = {}, externalTools: ToolDe
     },
   });
 
+  tools.push({
+    type: "function",
+    function: {
+      name: "web_fetch",
+      description:
+        "Fetch a URL and return its raw content (HTML/JSON/text). Uses the user's system proxy automatically when enabled, otherwise connects directly. Use this to access external sites that require a proxy (e.g. civitai, HuggingFace, docs).",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description: "The http(s) URL to fetch.",
+          },
+          method: {
+            type: "string",
+            description: "HTTP method. Defaults to GET.",
+          },
+          headers: {
+            type: "object",
+            description: "Optional request headers (object of key/value).",
+          },
+          body: {
+            description: "Optional request body (string or JSON object).",
+          },
+          parseJson: {
+            type: "boolean",
+            description: "If true, pretty-print the response as JSON.",
+          },
+          proxy: {
+            type: "string",
+            description: "Optional explicit proxy URL (e.g. http://127.0.0.1:7897). Overrides auto-detection.",
+          },
+          maxChars: {
+            type: "number",
+            description: "Max characters to return (default 200000).",
+          },
+          timeoutMs: {
+            type: "number",
+            description: "Timeout in ms (default 30000).",
+          },
+        },
+        required: ["url"],
+        additionalProperties: false,
+      },
+    },
+  });
+
   for (const tool of externalTools) {
     tools.push(tool);
   }
