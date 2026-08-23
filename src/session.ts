@@ -8,6 +8,7 @@ import ejs from "ejs";
 import type { ChatCompletionMessageParam, ChatCompletionContentPart } from "openai/resources/chat/completions";
 import { launchNotifyScript } from "./common/notify";
 import { buildThinkingRequestOptions } from "./common/openai-thinking";
+import { supportsMultimodal } from "./common/model-capabilities";
 import {
   getCompactPrompt,
   getDefaultSkillPrompt,
@@ -902,6 +903,11 @@ The candidate skills are as follows:\n\n`;
       } else {
         await this.replySession(this.activeSessionId, userPrompt, controller);
       }
+      // C2：图片转文本记忆——本轮回复完成后清空带图 user 消息的 base64，
+      // 图片 token 只发生一次（后续轮次该消息仅剩文本，不再累积）
+      if (this.activeSessionId) {
+        this.consumeLatestImageMessage(this.activeSessionId);
+      }
     } catch (error) {
       if (!this.isAbortLikeError(error) && !controller.signal.aborted) {
         throw error;
@@ -1368,7 +1374,12 @@ ${skillMd}
     }));
 
     for (let i = startIndex; i < endIndex; i += 1) {
-      sessionMessages[i] = { ...sessionMessages[i], compacted: true, updateTime: now };
+      const msg = sessionMessages[i];
+      // 跳过图片消息：图片 base64 不进压缩请求，且压缩后图片会永久丢失
+      if (msg.role === "user" && Array.isArray(msg.contentParams) && msg.contentParams.length > 0) {
+        continue;
+      }
+      sessionMessages[i] = { ...msg, compacted: true, updateTime: now };
     }
 
     const summaryMessage: SessionMessage = {
@@ -1852,6 +1863,27 @@ ${skillMd}
     return updated;
   }
 
+  // C2：图片转文本记忆——清空最新带图 user 消息的 contentParams（base64），
+  // 保留文本；图片 token 只发一次，后续轮次不再累积
+  private consumeLatestImageMessage(sessionId: string): void {
+    const messages = this.listSessionMessages(sessionId);
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const msg = messages[i];
+      if (msg.role !== "user" || !Array.isArray(msg.contentParams) || msg.contentParams.length === 0) {
+        continue;
+      }
+      const hasImage = msg.contentParams.some(
+        (p) => p && (p as { type?: string }).type === "image_url"
+      );
+      if (!hasImage) {
+        continue;
+      }
+      messages[i] = { ...msg, contentParams: null, updateTime: new Date().toISOString() };
+      this.saveSessionMessages(sessionId, messages);
+      break;
+    }
+  }
+
   private buildUserMessage(sessionId: string, prompt: UserPromptContent): SessionMessage {
     const now = new Date().toISOString();
     const imageParams =
@@ -2190,12 +2222,18 @@ ${skillMd}
       if (content) {
         contentParts.push({ type: "text", text: content });
       }
+      const multimodal = supportsMultimodal(model);
       const params = Array.isArray(message.contentParams) ? message.contentParams : [message.contentParams];
       for (const param of params) {
-        const part = param as ChatCompletionContentPart;
-        // DeepSeek V4 does not support multimodal; skip image_url parts
-        if (part && part.type !== "image_url") {
-          contentParts.push(part);
+        const part = param as { type?: string; image_url?: { url?: string } } | null;
+        if (part && part.type === "image_url" && part.image_url && typeof part.image_url.url === "string") {
+          // 非多模态模型跳过图片（session 层防御；vision 模型 detail auto 由服务端自动适配）
+          if (!multimodal) {
+            continue;
+          }
+          contentParts.push({ type: "image_url", image_url: { url: part.image_url.url, detail: "auto" } });
+        } else if (part && typeof part === "object") {
+          contentParts.push(part as ChatCompletionContentPart);
         }
       }
       const contentValue: string | ChatCompletionContentPart[] = contentParts.length > 0 ? contentParts : content;

@@ -15,7 +15,8 @@ VSCode 内置的交互式 AI 编程助手，专为 DeepSeek V4 模型优化。
 | 差异汇总 / Diff Summary                     | 无              | 可折叠的 `Changes` 汇总，显示 `+N -M (N files)`，每个文件有独立的增删统计和可跳转行号 |
 | 主动上下文压缩 / Context Compression        | 无              | 主动压缩对话上下文，优化 token 用量，降低 API 成本                                    |
 | 余额显示 / Balance Display                  | 无              | 界面中显示 API 余额，点击余额自动跳转至 usage 页面                                    |
-| 模型快捷切换 / Model Quick Switcher         | 无              | 底部工具栏下拉菜单，在 `pro` / `flash` 之间切换（同时保存到 global 和 project 配置）  |
+| 模型快捷切换 / Model Quick Switcher         | 无              | 底部工具栏下拉菜单，在 `pro` / `flash` / `vision` 之间切换（同时保存到 global 和 project 配置）  |
+| 图像理解 / Vision Support                   | 无              | `deepseek-v4-flash-vision-exp` 支持图片输入：聊天框粘贴/拖入图片，会话历史保留缩略图，非 vision 模型自动拦截  |
 | 思考强度快捷切换 / Reasoning Quick Switcher | 无              | 底部工具栏下拉菜单，在 `max` / `high` 之间切换                                        |
 | 工作区切换 / Workspace Switching            | 无              | 跨项目浏览所有对话记录；加载其他项目的对话时显示横幅提示，一键切换工作区              |
 | 设置页面 / Settings Page                    | 无              | 插件内置设置界面，支持 Global / Project 折叠分区，API key、模型、思考开关等           |

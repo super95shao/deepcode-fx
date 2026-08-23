@@ -2,7 +2,7 @@
   "name": "deepcode-fx",
   "displayName": "DeepCode FX",
   "description": "Forked from DeepCode VSCode with additional features: diff summary, edit matching, context compression, balance display, model/reasoning quick switcher, workspace switching",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "publisher": "shao",
   "repository": {
     "type": "git",

@@ -20,6 +20,7 @@ import {
   type ResolvedDeepcodingSettings,
 } from "./settings";
 import { setShellIfWindows } from "./common/shell-utils";
+import { supportsMultimodal } from "./common/model-capabilities";
 
 const DEFAULT_MODEL = "deepseek-v4-pro";
 const DEFAULT_BASE_URL = "https://api.deepseek.com";
@@ -379,10 +380,24 @@ class DeepcodingViewProvider implements vscode.WebviewViewProvider {
 
     const webview = this.webviewView.webview;
     const normalizedImages = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
+    // 多模态门控：当前模型不支持图片时拦截（vision 模型外的模型带图会 400）
+    if (normalizedImages.length > 0) {
+      const settings = this.resolveCurrentSettings();
+      if (!supportsMultimodal(settings.model)) {
+        void vscode.window.showErrorMessage(
+          `当前模型 ${settings.model} 不支持图片输入，请切换到 deepseek-v4-flash-vision-exp 后再发送图片。`
+        );
+        return;
+      }
+    }
     const displayPrompt = prompt || (normalizedImages.length > 0 ? "粘贴的图像" : "");
 
-    // 先显示用户消息（原始文本，不做 HTML 格式化）
-    webview.postMessage({ type: "userMessage", content: displayPrompt });
+    // 先显示用户消息（原始文本 + 图片缩略图）
+    webview.postMessage({
+      type: "userMessage",
+      content: displayPrompt,
+      images: normalizedImages.length > 0 ? normalizedImages : undefined,
+    });
 
     webview.postMessage({ type: "loading", value: true });
 

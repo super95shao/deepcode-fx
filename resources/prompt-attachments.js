@@ -1,6 +1,9 @@
 (function () {
   const ATTACHMENT_LABEL = "粘贴的图像";
   const PREVIEW_OFFSET = 10;
+  const MAX_IMAGE_BYTES = 32 * 1024 * 1024; // 32 MiB（官方单图上限）
+  const MAX_IMAGE_SIDE = 1600; // 缩放最长边（官方会再缩到 ~800²，先缩省请求体）
+  const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
   function createElement(tagName, className) {
     const element = document.createElement(tagName);
@@ -11,7 +14,7 @@
   }
 
   function isImageFile(file) {
-    return Boolean(file && typeof file.type === "string" && file.type.startsWith("image/"));
+    return Boolean(file && typeof file.type === "string" && ALLOWED_MIME.has(file.type));
   }
 
   function readFileAsDataUrl(file) {
@@ -20,6 +23,38 @@
       reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
       reader.onerror = () => reject(reader.error || new Error("Failed to read file."));
       reader.readAsDataURL(file);
+    });
+  }
+
+  // 缩放图片（canvas）：最长边 > MAX_IMAGE_SIDE 时等比缩小，返回 JPEG data URL
+  function resizeImageIfNeeded(dataUrl, mimeType) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxSide = Math.max(img.width, img.height);
+        if (maxSide <= MAX_IMAGE_SIDE) {
+          resolve(dataUrl);
+          return;
+        }
+        const scale = MAX_IMAGE_SIDE / maxSide;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        // 缩放后统一输出 JPEG（GIF 动画缩放后只取首帧，可接受）
+        try {
+          resolve(canvas.toDataURL("image/jpeg", 0.9));
+        } catch {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
     });
   }
 
@@ -131,7 +166,7 @@
     function createAttachmentNode() {
       const wrapper = createElement(
         "div",
-        "chat-attached-context-attachment show-file-icons"
+        "chat-attached-context-attachment chat-attached-context-image"
       );
       wrapper.tabIndex = 0;
       wrapper.setAttribute("role", "button");
@@ -150,25 +185,13 @@
         clear();
       });
 
-      const iconLabel = createElement("div", "monaco-icon-label");
-      const iconLabelContainer = createElement("div", "monaco-icon-label-container");
-      const iconNameContainer = createElement("span", "monaco-icon-name-container");
-      iconLabelContainer.appendChild(iconNameContainer);
-      iconLabel.appendChild(iconLabelContainer);
-
-      const pill = createElement("div", "chat-attached-context-pill");
-      const image = createElement("img", "chat-attached-context-pill-image");
-      image.src = attachment.dataUrl;
-      image.alt = ATTACHMENT_LABEL;
-      pill.appendChild(image);
-
-      const text = createElement("span", "chat-attached-context-custom-text");
-      text.textContent = ATTACHMENT_LABEL;
+      // 直接显示大图缩略图（替代原小 pill + 文件名）
+      const thumb = createElement("img", "chat-attached-context-thumb");
+      thumb.src = attachment.dataUrl;
+      thumb.alt = ATTACHMENT_LABEL;
 
       wrapper.appendChild(removeButton);
-      wrapper.appendChild(iconLabel);
-      wrapper.appendChild(pill);
-      wrapper.appendChild(text);
+      wrapper.appendChild(thumb);
 
       const show = () => showPreview(wrapper);
       wrapper.addEventListener("mouseenter", show);
@@ -218,12 +241,18 @@
       if (!isImageFile(file)) {
         return false;
       }
+      if (file.size > MAX_IMAGE_BYTES) {
+        console.error("Image too large (max 32 MiB).", file.size);
+        return false;
+      }
 
       const dataUrl = await readFileAsDataUrl(file);
+      const mimeType = file.type || "image/png";
+      const resized = await resizeImageIfNeeded(dataUrl, mimeType);
       return setAttachmentData({
         name: file.name || ATTACHMENT_LABEL,
-        mimeType: file.type || "image/png",
-        dataUrl,
+        mimeType,
+        dataUrl: resized,
         label: ATTACHMENT_LABEL
       });
     }

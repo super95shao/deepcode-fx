@@ -92,6 +92,7 @@
                   <div class="toolbar-popup" id="modelPopup">
                     <div class="toolbar-popup-item" data-val="deepseek-v4-pro">deepseek-v4-pro</div>
                     <div class="toolbar-popup-item" data-val="deepseek-v4-flash">deepseek-v4-flash</div>
+                    <div class="toolbar-popup-item" data-val="deepseek-v4-flash-vision-exp">deepseek-v4-flash-vision-exp</div>
                   </div>
                 </div>
                 <div class="toolbar-dropdown" id="thinkingDropdownWrap">
@@ -146,6 +147,7 @@
                 <select class="settings-select" id="userModel">
                   <option value="deepseek-v4-flash">deepseek-v4-flash</option>
                   <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+                  <option value="deepseek-v4-flash-vision-exp">deepseek-v4-flash-vision-exp</option>
                 </select>
               </label>
               <label class="settings-field settings-field-checkbox">
@@ -176,6 +178,7 @@
                 <select class="settings-select" id="projectModel">
                   <option value="deepseek-v4-flash">deepseek-v4-flash</option>
                   <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+                  <option value="deepseek-v4-flash-vision-exp">deepseek-v4-flash-vision-exp</option>
                 </select>
               </label>
               <label class="settings-field settings-field-checkbox">
@@ -758,7 +761,7 @@
         return false;
       }
 
-      function addBubble(content, role, meta, shouldConnectToPrev = false) {
+      function addBubble(content, role, meta, shouldConnectToPrev = false, imageUrls = []) {
 
         const bubble = document.createElement("div");
         bubble.className = "bubble " + role;
@@ -770,6 +773,17 @@
 
         if (role === "user") {
           // 普通用户气泡
+          bubble.textContent = content;
+          // 图片附件缩略图（会话历史 / 即时发送）
+          if (Array.isArray(imageUrls)) {
+            imageUrls.filter(Boolean).forEach((url) => {
+              const img = document.createElement("img");
+              img.className = "chat-history-image";
+              img.src = url;
+              img.alt = "image";
+              bubble.appendChild(img);
+            });
+          }
           bubble.textContent = content;
         } else if (role === "assistant") {
           if (meta && meta.asThinking === true) {
@@ -1876,7 +1890,7 @@
         // 同步快捷切换按钮
         var model = (data.projectSettings && data.projectSettings.model) || (data.userSettings && data.userSettings.model) || "deepseek-v4-pro";
         var effort = (data.projectSettings && data.projectSettings.reasoningEffort) || (data.userSettings && data.userSettings.reasoningEffort) || "max";
-        document.getElementById("modelToggleBtn").textContent = L.model + ": " + (model === "deepseek-v4-pro" ? "pro" : "flash");
+        document.getElementById("modelToggleBtn").textContent = L.model + ": " + modelShortName(model);
         document.getElementById("thinkingToggleBtn").textContent = L.reasoning + ": " + effort;
       }
 
@@ -1901,6 +1915,12 @@
       // ── 本地化 ──
       var isZh = (navigator.language || "").startsWith("zh");
       var L = { model: isZh ? "模型" : "Model", reasoning: isZh ? "思考强度" : "Reasoning" };
+
+      function modelShortName(model) {
+        if (model === "deepseek-v4-pro") return "pro";
+        if (model === "deepseek-v4-flash-vision-exp") return "vision";
+        return "flash";
+      }
 
       function updateDropdownLabels() {
         var btn = document.getElementById("modelToggleBtn");
@@ -1941,7 +1961,7 @@
       });
 
       setupDropdown("modelDropdownWrap", "modelToggleBtn", "modelPopup", function (val, display) {
-        var shortName = val === "deepseek-v4-pro" ? "pro" : "flash";
+        var shortName = modelShortName(val);
         vscode.postMessage({ type: "loadSettings" });
         var cb = function (e) {
           if (e.data.type === "settingsData") {
@@ -2138,7 +2158,12 @@
         if (msg.role === "system") {
           addBubble(msg.content, "system", msg.meta, shouldConnect);
         } else if (msg.role === "user") {
-          addBubble(msg.content, "user", msg.meta, false);
+          const imgUrls = Array.isArray(msg.contentParams)
+            ? msg.contentParams
+                .map((p) => (p && p.type === "image_url" && p.image_url ? p.image_url.url : null))
+                .filter(Boolean)
+            : [];
+          addBubble(msg.content, "user", msg.meta, false, imgUrls);
         } else if (msg.role === "assistant") {
           // 文件修改汇总：渲染成可点击的编辑结果样式
           if (msg.meta && msg.meta.isDiffSummary) {
@@ -2294,8 +2319,8 @@
           }
           updateLoadingText();
         } else if (message.type === "userMessage") {
-          // 显示用户消息（纯文本）
-          addBubble(message.content || "", "user", message.meta, false);
+          // 显示用户消息（纯文本 + 图片缩略图）
+          addBubble(message.content || "", "user", message.meta, false, message.images);
 
           // Record user message into history
           if (typeof message.content === "string") {

@@ -301,6 +301,16 @@ body {
   position: relative;
 }
 
+/* 用户气泡里的图片附件缩略图 */
+.bubble.user .chat-history-image {
+  display: block;
+  max-width: 240px;
+  max-height: 160px;
+  border-radius: 6px;
+  margin-top: 8px;
+  object-fit: contain;
+}
+
 /* Collapsible Bubble */
 .bubble-collapsible-header {
   display: flex;
@@ -1055,6 +1065,21 @@ textarea::placeholder {
 .monaco-icon-label-container,
 .monaco-icon-name-container {
   display: none;
+}
+
+.chat-attached-context-attachment.chat-attached-context-image {
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+}
+
+.chat-attached-context-thumb {
+  display: block;
+  max-width: 220px;
+  max-height: 64px;
+  border-radius: 4px;
+  object-fit: contain;
+  cursor: pointer;
 }
 
 .chat-attached-context-pill {

@@ -177,7 +177,11 @@ export function getCompactPrompt(sessionMessages: SessionMessage[]): string {
         id: message.id,
         role: message.role,
         content: message.content,
-        contentParams: message.contentParams,
+        // 图片消息的 base64 不进压缩请求（体积 + 无用）
+        contentParams:
+          message.role === "user" && Array.isArray(message.contentParams) && message.contentParams.length > 0
+            ? null
+            : message.contentParams,
         messageParams: message.messageParams,
         createTime: message.createTime,
       })
