@@ -2130,12 +2130,24 @@ ${skillMd}
       }
 
       for (const followUpMessage of execution.result.followUpMessages ?? []) {
-        if (followUpMessage.role !== "system") {
-          continue;
+        if (followUpMessage.role === "user") {
+          // 图片 follow-up：以 user 消息发送（DeepSeek vision 图片只能在 user 消息）
+          const imageUrls = Array.isArray(followUpMessage.contentParams)
+            ? followUpMessage.contentParams
+                .map((p) => {
+                  const part = p as { type?: string; image_url?: { url?: string } } | null;
+                  return part && part.type === "image_url" && part.image_url ? part.image_url.url : null;
+                })
+                .filter((url): url is string => Boolean(url))
+            : [];
+          followUpMessages.push(
+            this.buildUserMessage(sessionId, { text: followUpMessage.content, imageUrls })
+          );
+        } else if (followUpMessage.role === "system") {
+          followUpMessages.push(
+            this.buildSystemMessage(sessionId, followUpMessage.content, followUpMessage.contentParams ?? null)
+          );
         }
-        followUpMessages.push(
-          this.buildSystemMessage(sessionId, followUpMessage.content, followUpMessage.contentParams ?? null)
-        );
       }
     }
 
@@ -2227,8 +2239,8 @@ ${skillMd}
       for (const param of params) {
         const part = param as { type?: string; image_url?: { url?: string } } | null;
         if (part && part.type === "image_url" && part.image_url && typeof part.image_url.url === "string") {
-          // 非多模态模型跳过图片（session 层防御；vision 模型 detail auto 由服务端自动适配）
-          if (!multimodal) {
+          // 图片只在 user 消息（DeepSeek vision：system/assistant 带图 400）；非多模态模型也跳过
+          if (message.role !== "user" || !multimodal) {
             continue;
           }
           contentParts.push({ type: "image_url", image_url: { url: part.image_url.url, detail: "auto" } });

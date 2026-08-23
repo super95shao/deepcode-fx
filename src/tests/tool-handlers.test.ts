@@ -701,7 +701,7 @@ test("Edit preserves CRLF line endings for existing files", async () => {
   assert.equal(fs.readFileSync(filePath, "utf8"), "alpha\r\ngamma\r\n");
 });
 
-test("Read returns an acknowledgement for images and attaches the image as a follow-up system message", async () => {
+test("Read returns an acknowledgement for images and attaches the image as a follow-up user message", async () => {
   const workspace = createTempWorkspace();
   const filePath = path.join(workspace, "pixel.png");
   fs.writeFileSync(
@@ -721,7 +721,7 @@ test("Read returns an acknowledgement for images and attaches the image as a fol
   assert.equal(readResult.followUpMessages?.length, 1);
 
   const followUpMessage = readResult.followUpMessages?.[0];
-  assert.equal(followUpMessage?.role, "system");
+  assert.equal(followUpMessage?.role, "user");
   assert.match(followUpMessage?.content ?? "", /pixel\.png/);
   const contentParams = Array.isArray(followUpMessage?.contentParams) ? followUpMessage.contentParams : [];
   assert.equal(contentParams.length, 1);

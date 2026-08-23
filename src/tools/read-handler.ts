@@ -494,7 +494,8 @@ function getImageMimeType(ext: string): string {
 function buildImageFollowUpMessage(filePath: string, mime: string, buffer: Buffer): ToolExecutionFollowUpMessage {
   const fileName = path.basename(filePath);
   return {
-    role: "system",
+    // 图片必须放在 user 消息（DeepSeek vision：system/assistant 带图返回 400）
+    role: "user",
     content:
       `The read tool has loaded \`${fileName}\`. ` + "Use the attached image content to answer the original request.",
     contentParams: [
